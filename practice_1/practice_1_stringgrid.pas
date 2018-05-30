@@ -95,8 +95,8 @@ end;
 procedure LoadLinkedListIntoStringGrid(FileLinkedList: TLineRecordLinkedList;
   StringGrid: TStringGrid);
 var
-  MaxRow, MaxCol, NowRow, NowCol, Index: Integer;
-  CurrentNode: TNode;
+  MaxRow, MaxCol, NowRow, NowCol, Index, Count: Integer;
+  CurrentNodePtr: TNodePtr;
   CurrentLineRecord: TLineRecord;
 begin
   MaxRow:=FileLinkedList.Size;
@@ -104,35 +104,36 @@ begin
 
   MaxCol:=0;
   NowRow:=1;
+  Count:=0;
+  CurrentNodePtr:=FileLinkedList.Head;
 
-  CurrentNode:=FileLinkedList.Head^;
-  while CurrentNode.NodePrt<>Nil do
-  begin
+  repeat
     NowCol:=0;
-    CurrentLineRecord:=CurrentNode.LineRecord;
+    CurrentLineRecord:=CurrentNodePtr^.LineRecordPtr^;
     if CurrentLineRecord.ItemsCount>MaxCol then
     begin
       MaxCol:=CurrentLineRecord.ItemsCount;
       StringGrid.ColCount:=MaxCol+1;
     end;
 
+    StringGrid.Cells[NowCol, NowRow]:=IntToStr(NowRow);
     NowCol:=NowCol+1;
     StringGrid.Cells[NowCol, NowRow]:=CurrentLineRecord.Command;
     NowCol:=NowCol+1;
     StringGrid.Cells[NowCol, NowRow]:=CurrentLineRecord.Name;
-    for Index:=0 to Length(CurrentLineRecord.KeyValuePairs)-1 do
+    if CurrentLineRecord.KeyValuePairs.Count<>0 then
     begin
-      NowCol:=NowCol+1;
-      StringGrid.Cells[NowCol, NowRow]:=CurrentLineRecord.KeyValuePairs[Index].Key;
-      if CurrentLineRecord.KeyValuePairs[Index].Value<>'no =' then
+      for Index:=0 to (CurrentLineRecord.KeyValuePairs.Count-1) do
       begin
         NowCol:=NowCol+1;
-        StringGrid.Cells[NowCol, NowRow]:=CurrentLineRecord.KeyValuePairs[Index].Value;
+        StringGrid.Cells[NowCol, NowRow]:=CurrentLineRecord.KeyValuePairs[Index];
       end;
     end;
 
-    CurrentNode:=CurrentNode.NodePrt^;
-  end;
+    CurrentNodePtr:=CurrentNodePtr^.NodePtr;
+    NowRow:=NowRow+1;
+    Count:=Count+1;
+  until Count=FileLinkedList.Size;
 end;
 
 procedure AutoResizeColsWidth(StringGrid: TStringGrid);
@@ -209,12 +210,15 @@ procedure TPractice1.Button_LinkList_RunClick(Sender: TObject);
 var
   LinkedList: TLineRecordLinkedList;
   FileName: String;
+
 begin
   if OpenDialog1.Execute then
   begin
     FileName:=OpenDialog1.FileName;
 
-    InitLineRecordLinkedList(LinkedList);
+    LinkedList.Head:=Nil;
+    LinkedList.Size:=0;
+
     ReadFileIntoLinkedList(LinkedList, FileName);
     LoadLinkedListIntoStringGrid(LinkedList, StringGrid1);
     AutoResizeColsWidth(StringGrid1);
