@@ -8,22 +8,18 @@ uses
   Classes, SysUtils, practice_1_tools, Dialogs;
 
 type
-  KeyValueRecord = record
-    Key: String;
-    Value: String;
-  end;
-
+  TLineRecordPtr = ^TLineRecord;
   TLineRecord = record
     Command: String;
     Name: String;
-    KeyValuePairs: Array of KeyValueRecord;
+    KeyValuePairs: TStringList;
     ItemsCount: Integer;
   end;
 
   TNodePtr = ^TNode;
   TNode = record
-    LineRecord: TLineRecord;
-    NodePrt: TNodePtr
+    LineRecordPtr: TLineRecordPtr;
+    NodePtr: TNodePtr
   end;
 
   TLineRecordLinkedList = record
@@ -31,63 +27,20 @@ type
     Size: Integer;
   end;
 
-procedure InitLineRecordLinkedList(var LinkedList: TLineRecordLinkedList);
-procedure AddAfterNode(var Node: TNode; LineRecord: TLineRecord);
-procedure AppendLinkedList(var LinkedList: TLineRecordLinkedList; LineRecord: TLineRecord);
-procedure ConvertLineIntoLineRecord(var LineRecord: TLineRecord; Line: String);
+procedure ConvertLineIntoLineRecordPtr(var LineRecordPtr: TLineRecordPtr; Line: String);
 procedure ReadFileIntoLinkedList(var LinkedList: TLineRecordLinkedList; FileName: String);
+procedure AppendLinkedList(var LinkedList: TLineRecordLinkedList; LineRecordPtr: TLineRecordPtr);
 
 implementation
 
-procedure InitLineRecordLinkedList(var LinkedList: TLineRecordLinkedList);
-begin
-  LinkedList.Head:=nil;
-  LinkedList.Size:=0;
-end;
-
-procedure AddAfterNode(var Node: TNode; LineRecord: TLineRecord);
+procedure ConvertLineIntoLineRecordPtr(var LineRecordPtr: TLineRecordPtr; Line: String);
 var
-  TempNodePtr: TNodePtr;
-  TempNode: TNode;
-begin
-  TempNodePtr:=Node.NodePrt;
-  TempNode.LineRecord:=LineRecord;
-  TempNode.NodePrt:=TempNodePtr;
-  Node.NodePrt^:=TempNode;
-end;
-
-procedure AppendLinkedList(var LinkedList: TLineRecordLinkedList; LineRecord: TLineRecord);
-var
-  NewNode: TNode;
-  NewNodePtr: TNodePtr;
-  TempNode: TNode;
-begin
-  NewNode.LineRecord:=LineRecord;
-  NewNode.NodePrt:=Nil;
-  TempNode:=LinkedList.Head^;
-  if LinkedList.Head=Nil then LinkedList.Head^:=TempNode
-  else
-  begin
-    while TempNode.NodePrt<>Nil do
-    begin
-      TempNode:=TempNode.NodePrt^;
-    end;
-    TempNode.NodePrt^:=NewNode;
-  end;
-  LinkedList.Size:=LinkedList.Size+1;
-end;
-
-procedure ConvertLineIntoLineRecord(var LineRecord: TLineRecord; Line: String);
-var
-  TempStringList, KeyValueStringList: TStringList;
-  ItemsCount, KeyValuePairsCount, Index: Integer;
+  TempStringList, KeyValuePair: TStringList;
+  ItemsCount, Index: Integer;
   Command: String;
   Name: String;
-  KeyValuePair: KeyValueRecord;
-  KeyValueArray: Array of KeyValueRecord;
 begin
   ItemsCount:=0;
-  KeyValuePairsCount:=0;
   TempStringList:=TStringList.Create;
 
   SplitString(TempStringList, Line, ' ', 1);
@@ -105,37 +58,27 @@ begin
   SplitString(TempStringList, TempStringList[1], ',');
   Name:=TempStringList[0];
   ItemsCount:=ItemsCount+1;
-  KeyValuePairsCount:=TempStringList.Count-1;
-  SetLength(KeyValueArray, KeyValuePairsCount);
+  LineRecordPtr^.KeyValuePairs:=TStringList.Create;
+
   if TempStringList.Count>1 then
   begin
-    for Index:=1 to TempStringList.Count-1 do
+    for Index:=1 to (TempStringList.Count-1) do
     begin
-      KeyValueStringList:=TStringList.Create;
-      SplitString(KeyValueStringList, TempStringList[Index], '=', 1);
-      if KeyValueStringList.Count=2 then
-      begin
-        KeyValuePair.Key:=KeyValueStringList[0];
-        KeyValuePair.Value:=KeyValueStringList[1];
-        ItemsCount:=ItemsCount+2;
-      end else
-      begin
-        KeyValuePair.Key:=KeyValueStringList[0];
-        KeyValuePair.Value:='no =';
-        ItemsCount:=ItemsCount+1;
-      end;
-      KeyValueArray[Index-1]:=KeyValuePair;
-      KeyValueStringList.Free;
+      KeyValuePair:=TStringList.Create;
+      SplitString(KeyValuePair, TempStringList[Index], '=', 1);
+      LineRecordPtr^.KeyValuePairs.Add(KeyValuePair[0]);
+      if KeyValuePair.Count=2 then LineRecordPtr^.KeyValuePairs.Add(KeyValuePair[1]);
+      KeyValuePair.Free;
     end;
+    ItemsCount:=ItemsCount+LineRecordPtr^.KeyValuePairs.Count;
   end;
 
-  LineRecord.Command:=Command;
-  LineRecord.Name:=Name;
-  LineRecord.KeyValuePairs:=KeyValueArray;
-  LineRecord.ItemsCount:=ItemsCount;
+
+  LineRecordPtr^.Command:=Command;
+  LineRecordPtr^.Name:=Name;
+  LineRecordPtr^.ItemsCount:=ItemsCount;
 
   TempStringList.Free;
-  KeyValueArray:=Nil;
 end;
 
 procedure ReadFileIntoLinkedList(var LinkedList: TLineRecordLinkedList;
@@ -145,9 +88,10 @@ var
   TempText, PreviousText: String;
   LineFinished: Boolean;
   SlashIndex: integer;
-  LineRecord: TLineRecord;
+  LineRecordPtr: TLineRecordPtr;
 begin
-  InitLineRecordLinkedList(LinkedList);
+  LineFinished:=True;
+  PreviousText:='';
 
   try
     AssignFile(MyFile, FileName);
@@ -167,8 +111,9 @@ begin
     if SlashIndex=0 then
     begin
       LineFinished:=True;
-      ConvertLineIntoLineRecord(LineRecord, TempText);
-      AppendLinkedList(LinkedList, LineRecord);
+      new(LineRecordPtr);
+      ConvertLineIntoLineRecordPtr(LineRecordPtr, TempText);
+      AppendLinkedList(LinkedList, LineRecordPtr);
     end
     else
     begin
@@ -178,8 +123,33 @@ begin
       Continue;
     end;
   end;
+
+end;
+
+procedure AppendLinkedList(var LinkedList: TLineRecordLinkedList;
+  LineRecordPtr: TLineRecordPtr);
+var
+  NewNode: TNodePtr;
+  TempNode: TNodePtr;
+begin
+  New(NewNode);
+  NewNode^.LineRecordPtr:=LineRecordPtr;
+  NewNode^.NodePtr:=Nil;
+  if LinkedList.Head=Nil then
+  begin
+    LinkedList.Head:=NewNode;
+    LinkedList.Size:=LinkedList.Size+1;
+  end else
+  begin
+    TempNode:=LinkedList.Head;
+    while TempNode^.NodePtr<>Nil do
+    begin
+      TempNode:=TempNode^.NodePtr;
+    end;
+    TempNode^.NodePtr:=NewNode;
+    LinkedList.Size:=LinkedList.Size+1;
+  end;
 end;
 
 
 end.
-
