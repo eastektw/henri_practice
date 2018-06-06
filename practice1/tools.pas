@@ -18,14 +18,13 @@ var
   TempString:String;
   DelimiterIndex, DelimiterCount:Integer;
 begin
+  AStringList.Clear;
   if Length(Source)=0 then
   begin
-    AStringList.Clear;
     ShowMessage('You can''t specify empty string to be delimited, procedure exited.');
     Exit;
   end;
   TempString:=Source;
-  AStringList.Clear;
   DelimiterIndex:=Pos(Delimiter,Source);
   if DelimiterIndex=0 then
   begin

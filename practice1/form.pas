@@ -197,7 +197,7 @@ end;
 procedure TForm1.TListButtonClick(Sender: TObject);
 var
   FileName:String;
-  CommandLineTList:TList;
+  CommandLineTList:TCOMMANDS_list;
 begin
   if OpenDialog1.Execute then
   begin
@@ -206,16 +206,14 @@ begin
     except
       exit;
     end;
-    CommandLineTList:=TList.Create;
+    CommandLineTList:=TCOMMANDS_list.Create;
     try
       ReadFile_by_Tlist(FileName, CommandLineTList);
       ReadTListIntoStringGrid(CommandLineTList, StringGrid1);
       ResizeStringGridColWidth(StringGrid1);
       StringGrid1.FixedCols := 2;
-
-      FreeList(CommandLineTList);
     finally
-      CommandLineTList.Free;
+      FreeList(CommandLineTList);
     end;
   end;
 end;
@@ -259,10 +257,10 @@ begin
     New(CommandLineHeadPtr);
     try
       ReadFile_by_LinkedList(FileName, CommandLineHeadPtr);
+      //WriteFile_by_LinkedList(StringReplace(FileName, '.txt', '_LinkedList.txt', [rfReplaceAll, rfIgnoreCase]), CommandLineHeadPtr);
       ReadLinkedListIntoStringGrid(CommandLineHeadPtr, StringGrid1);
       ResizeStringGridColWidth(StringGrid1);
       StringGrid1.FixedCols := 2;
-
     finally
       FreeLinkedList(CommandLineHeadPtr);
     end;
