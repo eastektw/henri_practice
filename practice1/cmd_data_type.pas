@@ -1,5 +1,4 @@
 unit cmd_data_type;
-{pull request}
 
 {$mode objfpc}{$H+}
 
