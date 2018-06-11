@@ -84,25 +84,26 @@ var
 begin
   try
     AssignFile(Command_File_Object, AFile);
+
+    try
+      Reset(Command_File_Object);
+      CommandLine:='';
+      CommandLine_Count:=0;
+      while not EOF(Command_File_Object) do
+      begin
+        CommandLine:=ReadFile_to_CompleteCommandLine(Command_File_Object);
+        CommandLine_Count:=CommandLine_Count+1;
+        SetLength(AFileData, CommandLine_Count);
+        CommandLineIntoCommandRecord(CommandLine, AFileData[CommandLine_Count-1]);
+      end;
+    finally
+      CloseFile(Command_File_Object);
+    end;
+
   except
     ShowMessage('Cannot open the file.');
-    exit;
   end;
 
-  try
-    Reset(Command_File_Object);
-    CommandLine:='';
-    CommandLine_Count:=0;
-    while not EOF(Command_File_Object) do
-    begin
-      CommandLine:=ReadFile_to_CompleteCommandLine(Command_File_Object);
-      CommandLine_Count:=CommandLine_Count+1;
-      SetLength(AFileData, CommandLine_Count);
-      CommandLineIntoCommandRecord(CommandLine, AFileData[CommandLine_Count-1]);
-    end;
-  finally
-    CloseFile(Command_File_Object);
-  end;
 end;
 
 procedure ReadFile_by_Tlist(Afile: string; AFileData: TCOMMANDS_list);
@@ -113,25 +114,26 @@ var
 begin
   try
     AssignFile(Command_File_Object, AFile);
+
+    try
+      Reset(Command_File_Object);
+      CommandLine:='';
+      while not EOF(Command_File_Object) do
+      begin
+        CommandLine:=ReadFile_to_CompleteCommandLine(Command_File_Object);
+        New(CommandLineRecord_Ptr);
+        CommandLineRecord_Ptr^.Next:=Nil;
+        CommandLineIntoCommandRecord(CommandLine, CommandLineRecord_Ptr^);
+        AFileData.Add(CommandLineRecord_Ptr);
+      end;
+    finally
+      CloseFile(Command_File_Object);
+    end;
+
   except
     ShowMessage('Cannot open the file.');
-    exit;
   end;
 
-  try
-    Reset(Command_File_Object);
-    CommandLine:='';
-    while not EOF(Command_File_Object) do
-    begin
-      CommandLine:=ReadFile_to_CompleteCommandLine(Command_File_Object);
-      New(CommandLineRecord_Ptr);
-      CommandLineRecord_Ptr^.Next:=Nil;
-      CommandLineIntoCommandRecord(CommandLine, CommandLineRecord_Ptr^);
-      AFileData.Add(CommandLineRecord_Ptr);
-    end;
-  finally
-    CloseFile(Command_File_Object);
-  end;
 end;
 
 procedure ReadFile_by_LinkedList(AFile: String; const AFileData: PCOMMAND_Ptr);
@@ -143,30 +145,30 @@ var
 begin
   try
     AssignFile(Command_File_Object, AFile);
+
+    try
+      Reset(Command_File_Object);
+      CommandLine:='';
+      CommandLineRecord_Ptr:=AFileData;
+      while not EOF(Command_File_Object) do
+      begin
+        CommandLine:=ReadFile_to_CompleteCommandLine(Command_File_Object);
+        CommandLineIntoCommandRecord(CommandLine, CommandLineRecord_Ptr^);
+        if not EOF(Command_File_Object) then
+        begin
+          New(TempCommandLineRecord_Ptr);
+          CommandLineRecord_Ptr^.Next:=TempCommandLineRecord_Ptr;
+          CommandLineRecord_Ptr:=TempCommandLineRecord_Ptr;
+        end
+        else
+          CommandLineRecord_Ptr^.Next:=Nil;
+      end;
+    finally
+      CloseFile(Command_File_Object);
+    end;
+
   except
     ShowMessage('Cannot open the file.');
-    exit;
-  end;
-
-  try
-    Reset(Command_File_Object);
-    CommandLine:='';
-    CommandLineRecord_Ptr:=AFileData;
-    while not EOF(Command_File_Object) do
-    begin
-      CommandLine:=ReadFile_to_CompleteCommandLine(Command_File_Object);
-      CommandLineIntoCommandRecord(CommandLine, CommandLineRecord_Ptr^);
-      if not EOF(Command_File_Object) then
-      begin
-        New(TempCommandLineRecord_Ptr);
-        CommandLineRecord_Ptr^.Next:=TempCommandLineRecord_Ptr;
-        CommandLineRecord_Ptr:=TempCommandLineRecord_Ptr;
-      end
-      else
-        CommandLineRecord_Ptr^.Next:=Nil;
-    end;
-  finally
-    CloseFile(Command_File_Object);
   end;
 end;
 
@@ -242,10 +244,10 @@ begin
   if TempStringList.count>1 then
   begin
     SetLength(ACommand_Line_Record.COMMAND_Params, (TempStringList.count-1));
+    ParamStringList:=TStringList.Create;
+
     for Index:=1 to (TempStringList.count-1) do
     begin
-      ParamStringList:=TStringList.Create;
-
       SplitString(ParamStringList, TempStringList[Index], '=', 1);
       ACommand_Line_Record.COMMAND_Params[Index-1].Param_name:=ParamStringList[0];
 
@@ -253,9 +255,9 @@ begin
         ACommand_Line_Record.COMMAND_Params[Index-1].Param_value:=ParamStringList[1]
       else
         ACommand_Line_Record.COMMAND_Params[Index-1].Param_value:='';
-
-      ParamStringList.Free;
     end;
+
+    ParamStringList.Free;
   end
   else
     SetLength(ACommand_Line_Record.COMMAND_Params, 0);
