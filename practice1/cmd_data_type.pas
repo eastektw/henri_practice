@@ -235,34 +235,37 @@ var
 begin
   TempStringList:=TStringList.Create;
 
-  SplitString(TempStringList, ACommand_Line, ' ', 1);
-  ACommand_Line_Record.COMMAND_type:=TempStringList[0];
+  try
+    SplitString(TempStringList, ACommand_Line, ' ', 1);
+    ACommand_Line_Record.COMMAND_type:=TempStringList[0];
 
-  SplitString(TempStringList,TempStringList[1], ',');
-  ACommand_Line_Record.COMMAND_name:=TempStringList[0];
+    SplitString(TempStringList,TempStringList[1], ',');
+    ACommand_Line_Record.COMMAND_name:=TempStringList[0];
 
-  if TempStringList.count>1 then
-  begin
-    SetLength(ACommand_Line_Record.COMMAND_Params, (TempStringList.count-1));
-    ParamStringList:=TStringList.Create;
-
-    for Index:=1 to (TempStringList.count-1) do
+    if TempStringList.count>1 then
     begin
-      SplitString(ParamStringList, TempStringList[Index], '=', 1);
-      ACommand_Line_Record.COMMAND_Params[Index-1].Param_name:=ParamStringList[0];
+      SetLength(ACommand_Line_Record.COMMAND_Params, (TempStringList.count-1));
+      ParamStringList:=TStringList.Create;
+      try
+        for Index:=1 to (TempStringList.count-1) do
+        begin
+          SplitString(ParamStringList, TempStringList[Index], '=', 1);
+          ACommand_Line_Record.COMMAND_Params[Index-1].Param_name:=ParamStringList[0];
 
-      if ParamStringList.count=2 then
-        ACommand_Line_Record.COMMAND_Params[Index-1].Param_value:=ParamStringList[1]
-      else
-        ACommand_Line_Record.COMMAND_Params[Index-1].Param_value:='';
-    end;
-
-    ParamStringList.Free;
-  end
-  else
-    SetLength(ACommand_Line_Record.COMMAND_Params, 0);
-
-  TempStringList.Free;
+          if ParamStringList.count=2 then
+            ACommand_Line_Record.COMMAND_Params[Index-1].Param_value:=ParamStringList[1]
+          else
+            ACommand_Line_Record.COMMAND_Params[Index-1].Param_value:='';
+        end;
+      finally
+        ParamStringList.Free;
+      end;
+    end
+    else
+      SetLength(ACommand_Line_Record.COMMAND_Params, 0);
+  finally
+    TempStringList.Free;
+  end;
 end;
 
 { TCOMMANDS_list }
