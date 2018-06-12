@@ -26,7 +26,7 @@ type
   private
 
   public
-    function ShapeObjectListToStringGrid(AObjectList:TObjectList; AStringGrid:TStringGrid):Boolean;
+    procedure ShapeObjectListToStringGrid(AObjectList:TObjectList; AStringGrid:TStringGrid);
   end;
 
 const
@@ -64,7 +64,7 @@ begin
       State:=True;
 
       if State then State:=ReadFileIntoObjecList(FileName, ShapeObjectList, ExpandValue);
-      if State then State:=ShapeObjectListToStringGrid(ShapeObjectList, StringGrid1);
+      ShapeObjectListToStringGrid(ShapeObjectList, StringGrid1);
       //if State then State
       //ReadTListIntoStringGrid(CommandLineTList, StringGrid1);
       //ResizeStringGridColWidth(StringGrid1);
@@ -76,17 +76,18 @@ begin
   end;
 end;
 
-function TForm1.ShapeObjectListToStringGrid(AObjectList: TObjectList;
-  AStringGrid: TStringGrid): Boolean;
+procedure TForm1.ShapeObjectListToStringGrid(AObjectList: TObjectList;
+  AStringGrid: TStringGrid);
 var
   ObjectListIndex, RowStartIndex:Integer;
 begin
   AStringGrid.RowCount:=AObjectList.Count+1;
   AStringGrid.ColCount:=7;//因為整筆資料中，線的屬性最多，屬性的資料總共有6筆，而又要在這筆資料前面加序號，所以最多會有7筆資料要填入
   RowStartIndex:=1;
-  for ObjectListIndex:=0 to (AObjectList.Count-1) do;
+
+  for ObjectListIndex:=0 to (AObjectList.Count-1) do
   begin
-    AStringGrid.Cells[0, RowStartIndex+ObjectListIndex]:=IntToStr(ObjectListIndex);
+    AStringGrid.Cells[0, RowStartIndex+ObjectListIndex]:=IntToStr(ObjectListIndex+1);
     AStringGrid.Cells[1, RowStartIndex+ObjectListIndex]:=TShape(AObjectList[ObjectListIndex]).Name;
 
     if AObjectList[ObjectListIndex] is TPoint then
@@ -104,9 +105,6 @@ begin
       AStringGrid.Cells[6, RowStartIndex+ObjectListIndex]:=FloatToStr(TLine(AObjectList[ObjectListIndex]).Radius / ExpandValue);
     end;
   end;
-
-
-
 end;
 
 end.

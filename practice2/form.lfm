@@ -7,7 +7,7 @@ object Form1: TForm1
   ClientHeight = 545
   ClientWidth = 700
   OnResize = FormResize
-  LCLVersion = '1.8.4.0'
+  LCLVersion = '1.8.2.0'
   object DataPresentPanel: TPanel
     Left = 0
     Height = 445
