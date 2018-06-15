@@ -8,66 +8,62 @@ uses
   Classes, SysUtils, Contnrs, Dialogs, tools;
 
 type
+  { TShapeType }
 
-  { TPointCoordinate }
-
-  TPointCoordinate=record
-    X:Integer;
-    Y:Integer;
-  end;
+  TShapeType = (None, PointType, LineType);
 
   { TShape }
 
   TShape=class
     private
-      NName:String;
+      NName:TShapeType;
 
-      function GetName:String;
-      procedure SetName(AName:String);
+      function GetName:TShapeType;
+      procedure SetName(AName:TShapeType);
     public
-      property Name:String read GetName write SetName;
+      property Name:TShapeType read GetName write SetName;
 
-      constructor create(AName:String);
+      constructor create(AName:TShapeType);
   end;
 
-  { TPoint }
+  { TPointShape }
 
-  TPoint=class(TShape)
+  TPointShape=class(TShape){change name}
     private
-      NPoint:TPointCoordinate;
+      NPoint:TPoint;{change to use TPoint}
       NRadius:Integer;
 
-      function GetPoint:TPointCoordinate;
-      procedure SetPoint(APoint:TPointCoordinate);
+      function GetPoint:TPoint;
+      procedure SetPoint(APoint:TPoint);
       function GetRadius:Integer;
       procedure SetRadius(ARadius:Integer);
     public
-      property Point:TPointCoordinate read GetPoint write SetPoint;
+      property Point:TPoint read GetPoint write SetPoint;
       property Radius:Integer read GetRadius write SetRadius;
 
-      constructor create(AName:String; APoint:TPointCoordinate; ARadius:Integer);overload;
+      constructor create(AName:TShapeType; APoint:TPoint; ARadius:Integer);overload;
   end;
 
-  { TLine }
+  { TLineShape }
 
-  TLine=class(TShape)
+  TLineShape=class(TShape)
     private
-      NPoint:TPointCoordinate;
-      NPoint2:TPointCoordinate;
+      NStartPoint:TPoint;
+      NEndPoint:TPoint;
       NRadius:Integer;
 
-      function GetPoint:TPointCoordinate;
-      procedure SetPoint(APoint:TPointCoordinate);
-      function GetPoint2:TPointCoordinate;
-      procedure SetPoint2(APoint:TPointCoordinate);
+      function GetStartPoint:TPoint;
+      procedure SetStartPoint(APoint:TPoint);
+      function GetEndPoint:TPoint;
+      procedure SetEndPoint(APoint:TPoint);
       function GetRadius:Integer;
       procedure SetRadius(ARadius:Integer);
     public
-      property Point:TPointCoordinate read GetPoint write SetPoint;
-      property Point2:TPointCoordinate read GetPoint2 write SetPoint2;
+      property StartPoint:TPoint read GetStartPoint write SetStartPoint;
+      property EndPoint:TPoint read GetEndPoint write SetEndPoint;
       property Radius:Integer read GetRadius write SetRadius;
 
-      constructor create(AName:String; APoint, APoint2:TPointCoordinate; ARadius:Integer);
+      constructor create(AName:TShapeType; AStartPoint, AEndPoint:TPoint; ARadius:Integer);
   end;
 
   function ReadFileIntoObjecList(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer):Boolean;
@@ -83,57 +79,59 @@ const
 var
   FileHandle:TextFile;
   TempString:String;
-  Name:String;
   TempStringList:TStringList;
   ShapeObject:TShape;
-  Radius:LongInt;
-  Point1, Point2:TPointCoordinate;
+  ShapeName:TShapeType;
+  ShapeRadius:LongInt;
+  Point1, Point2:TPoint;
   Index:integer;
 begin
   try
     AssignFile(FileHandle, AFileName);
     Reset(FileHandle);
-
-    while not EOF(FileHandle) do
-    begin
-      ReadLn(FileHandle, TempString);
-      Name:='';
-      TempStringList:=TStringList.Create;
-
-      try
-        if Length(TempString)<>0 then
-        begin
-          SplitString(TempStringList, TempString, ' ');
-          ClearEmptyStringElement(TempStringList);
-          Name:=TempStringList[0];
-          TempStringList.Delete(0);
-
-          //for Index:=0 to TempStringList.count-1 do ShowMessage(TempStringList[Index]);
-          Radius:=Trunc(StrToFloat(TempStringList[TempStringList.count-1])*ExpandValue);
-
-          if (TempStringList.Count>=2) and IsStringListNum(TempStringList) then
+    try
+      while not EOF(FileHandle) do
+      begin
+        ReadLn(FileHandle, TempString);
+        ShapeName:=None;
+        TempStringList:=TStringList.Create;
+        try
+          if Length(TempString)<>0 then
           begin
-            Point1.X:=Trunc(StrToFloat(TempStringList[0])*ExpandValue);
-            Point1.Y:=Trunc(StrToFloat(TempStringList[1])*ExpandValue);
+            SplitString(TempStringList, TempString, ' ');
+            ClearEmptyStringElement(TempStringList);
+            if TempStringList[0]=PointName then ShapeName:=PointType
+            else if TempStringList[0]=LineName then ShapeName:=LineType
+            else ShapeName:=None;
 
-            if (TempStringList.Count=3) and (Name=PointName) then
-              ShapeObject:=TPoint.create(Name, Point1, Radius)
-            else if (TempStringList.Count=5) and (Name=LineName) then
+            TempStringList.Delete(0);
+            ShapeRadius:=Trunc(StrToFloat(TempStringList[TempStringList.count-1])*ExpandValue);
+
+            if (TempStringList.Count>=2) and IsStringListNum(TempStringList) then
             begin
-              Point2.X:=Trunc(StrToFloat(TempStringList[2])*ExpandValue);
-              Point2.Y:=Trunc(StrToFloat(TempStringList[3])*ExpandValue);
+              Point1.X:=Trunc(StrToFloat(TempStringList[0])*ExpandValue);
+              Point1.Y:=Trunc(StrToFloat(TempStringList[1])*ExpandValue);
 
-              ShapeObject:=TLine.create(Name, Point1, Point2, Radius);
+              if (TempStringList.Count=3) and (ShapeName=PointType) then
+                ShapeObject:=TPointShape.create(ShapeName, Point1, ShapeRadius)
+              else if (TempStringList.Count=5) and (ShapeName=LineType) then
+              begin
+                Point2.X:=Trunc(StrToFloat(TempStringList[2])*ExpandValue);
+                Point2.Y:=Trunc(StrToFloat(TempStringList[3])*ExpandValue);
+                ShapeObject:=TLineShape.create(ShapeName, Point1, Point2, ShapeRadius);
+              end;
             end;
-          end;
 
-          AObjectList.Add(ShapeObject);
+            AObjectList.Add(ShapeObject);
+          end;
+        finally
+          TempStringList.Free;
         end;
-      finally
-        TempStringList.Free;
       end;
+      Result:=True;
+    finally
+      CloseFile(FileHandle);
     end;
-    Result:=True;
   except
     ShowMessage('Error, cannot open the file name you assign');
     Result:=False;
@@ -166,70 +164,70 @@ begin
   end;
 end;
 
-{ TLine }
+{ TLineShape }
 
-function TLine.GetPoint: TPointCoordinate;
+function TLineShape.GetStartPoint: TPoint;
 begin
-  Result:=NPoint;
+  Result:=NStartPoint;
 end;
 
-procedure TLine.SetPoint(APoint: TPointCoordinate);
+procedure TLineShape.SetStartPoint(APoint: TPoint);
 begin
-  NPoint:=APoint;
+  NStartPoint:=APoint;
 end;
 
-function TLine.GetPoint2: TPointCoordinate;
+function TLineShape.GetEndPoint: TPoint;
 begin
-  Result:=NPoint2;
+  Result:=NEndPoint;
 end;
 
-procedure TLine.SetPoint2(APoint: TPointCoordinate);
+procedure TLineShape.SetEndPoint(APoint: TPoint);
 begin
-  NPoint2:=APoint;
+  NEndPoint:=APoint;
 end;
 
-function TLine.GetRadius: Integer;
+function TLineShape.GetRadius: Integer;
 begin
   Result:=NRadius;
 end;
 
-procedure TLine.SetRadius(ARadius: Integer);
+procedure TLineShape.SetRadius(ARadius: Integer);
 begin
   NRadius:=ARadius;
 end;
 
-constructor TLine.create(AName: String; APoint, APoint2: TPointCoordinate;
-  ARadius: Integer);
+constructor TLineShape.create(AName: TShapeType; AStartPoint,
+  AEndPoint: TPoint; ARadius: Integer);
 begin
-  inherited create(AName);
-  SetPoint(APoint);
-  SetPoint2(APoint2);
+  Inherited create(AName);
+  SetStartPoint(AStartPoint);
+  SetEndPoint(AEndPoint);
   SetRadius(ARadius);
 end;
 
-{ TPoint }
+{ TPointShape }
 
-function TPoint.GetPoint: TPointCoordinate;
+function TPointShape.GetPoint: TPoint;
 begin
   Result:=NPoint;
 end;
 
-procedure TPoint.SetPoint(APoint: TPointCoordinate);
+procedure TPointShape.SetPoint(APoint: TPoint);
 begin
   NPoint:=APoint;
 end;
 
-function TPoint.GetRadius: Integer;
+function TPointShape.GetRadius: Integer;
 begin
   Result:=NRadius;
 end;
 
-procedure TPoint.SetRadius(ARadius: Integer);
+procedure TPointShape.SetRadius(ARadius: Integer);
 begin
   NRadius:=ARadius;
 end;
 
-constructor TPoint.create(AName: String; APoint: TPointCoordinate;
+constructor TPointShape.create(AName: TShapeType; APoint: TPoint;
   ARadius: Integer);
 begin
   Inherited create(AName);
@@ -239,17 +237,17 @@ end;
 
 { TShape }
 
-function TShape.GetName: String;
+function TShape.GetName: TShapeType;
 begin
   Result:=NName;
 end;
 
-procedure TShape.SetName(AName: String);
+procedure TShape.SetName(AName: TShapeType);
 begin
   NName:=AName;
 end;
 
-constructor TShape.create(AName: String);
+constructor TShape.create(AName: TShapeType);
 begin
   SetName(AName);
 end;

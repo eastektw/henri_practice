@@ -69,7 +69,6 @@ begin
       //ReadTListIntoStringGrid(CommandLineTList, StringGrid1);
       //ResizeStringGridColWidth(StringGrid1);
       //StringGrid1.FixedCols := 2;
-
     except
       exit;
     end;
@@ -78,31 +77,38 @@ end;
 
 procedure TForm1.ShapeObjectListToStringGrid(AObjectList: TObjectList;
   AStringGrid: TStringGrid);
+const
+  PointName='#P';
+  LineName='#L';
 var
   ObjectListIndex, RowStartIndex:Integer;
+  ShapeName:String;
 begin
   AStringGrid.RowCount:=AObjectList.Count+1;
-  AStringGrid.ColCount:=7;//因為整筆資料中，線的屬性最多，屬性的資料總共有6筆，而又要在這筆資料前面加序號，所以最多會有7筆資料要填入
+  AStringGrid.ColCount:=7;//因為整筆資料中，線的屬性最多，其屬性的資料總共有6筆，而又要在這筆資料前面加序號，所以最多會有7筆資料要填入
   RowStartIndex:=1;
 
   for ObjectListIndex:=0 to (AObjectList.Count-1) do
   begin
     AStringGrid.Cells[0, RowStartIndex+ObjectListIndex]:=IntToStr(ObjectListIndex+1);
-    AStringGrid.Cells[1, RowStartIndex+ObjectListIndex]:=TShape(AObjectList[ObjectListIndex]).Name;
+    if TShape(AObjectList[ObjectListIndex]).Name=PointType then ShapeName:=PointName
+    else if TShape(AObjectList[ObjectListIndex]).Name=LineType then ShapeName:=LineName
+    else continue;
+    AStringGrid.Cells[1, RowStartIndex+ObjectListIndex]:=ShapeName;
 
-    if AObjectList[ObjectListIndex] is TPoint then
+    if AObjectList[ObjectListIndex] is TPointShape then
     begin
-      AStringGrid.Cells[2, RowStartIndex+ObjectListIndex]:=FloatToStr(TPoint(AObjectList[ObjectListIndex]).Point.X / ExpandValue);
-      AStringGrid.Cells[3, RowStartIndex+ObjectListIndex]:=FloatToStr(TPoint(AObjectList[ObjectListIndex]).Point.Y / ExpandValue);
-      AStringGrid.Cells[4, RowStartIndex+ObjectListIndex]:=FloatToStr(TPoint(AObjectList[ObjectListIndex]).Radius / ExpandValue);
+      AStringGrid.Cells[2, RowStartIndex+ObjectListIndex]:=FloatToStr(TPointShape(AObjectList[ObjectListIndex]).Point.X / ExpandValue);
+      AStringGrid.Cells[3, RowStartIndex+ObjectListIndex]:=FloatToStr(TPointShape(AObjectList[ObjectListIndex]).Point.Y / ExpandValue);
+      AStringGrid.Cells[4, RowStartIndex+ObjectListIndex]:=FloatToStr(TPointShape(AObjectList[ObjectListIndex]).Radius / ExpandValue);
     end
-    else if AObjectList[ObjectListIndex] is TLine then
+    else if AObjectList[ObjectListIndex] is TLineShape then
     begin
-      AStringGrid.Cells[2, RowStartIndex+ObjectListIndex]:=FloatToStr(TLine(AObjectList[ObjectListIndex]).Point.X / ExpandValue);
-      AStringGrid.Cells[3, RowStartIndex+ObjectListIndex]:=FloatToStr(TLine(AObjectList[ObjectListIndex]).Point.Y / ExpandValue);
-      AStringGrid.Cells[4, RowStartIndex+ObjectListIndex]:=FloatToStr(TLine(AObjectList[ObjectListIndex]).Point2.X / ExpandValue);
-      AStringGrid.Cells[5, RowStartIndex+ObjectListIndex]:=FloatToStr(TLine(AObjectList[ObjectListIndex]).Point2.Y / ExpandValue);
-      AStringGrid.Cells[6, RowStartIndex+ObjectListIndex]:=FloatToStr(TLine(AObjectList[ObjectListIndex]).Radius / ExpandValue);
+      AStringGrid.Cells[2, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).StartPoint.X / ExpandValue);
+      AStringGrid.Cells[3, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).StartPoint.Y / ExpandValue);
+      AStringGrid.Cells[4, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).EndPoint.X / ExpandValue);
+      AStringGrid.Cells[5, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).EndPoint.Y / ExpandValue);
+      AStringGrid.Cells[6, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).Radius / ExpandValue);
     end;
   end;
 end;
