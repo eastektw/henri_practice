@@ -1,0 +1,53 @@
+object Form2: TForm2
+  Left = 679
+  Height = 550
+  Top = 212
+  Width = 700
+  Caption = 'Form2'
+  ClientHeight = 550
+  ClientWidth = 700
+  OnResize = FormResize
+  LCLVersion = '1.8.2.0'
+  object StringGridPanel: TPanel
+    Left = 0
+    Height = 500
+    Top = 0
+    Width = 700
+    Align = alClient
+    Caption = 'StringGridPanel'
+    ClientHeight = 500
+    ClientWidth = 700
+    TabOrder = 0
+    object CheckStringGrid: TStringGrid
+      Left = 1
+      Height = 498
+      Top = 1
+      Width = 698
+      Align = alClient
+      ColCount = 7
+      RowCount = 1
+      TabOrder = 0
+      OnDrawCell = CheckStringGridDrawCell
+    end
+  end
+  object ButtonPanel: TPanel
+    Left = 0
+    Height = 50
+    Top = 500
+    Width = 700
+    Align = alBottom
+    Caption = 'ButtonPanel'
+    ClientHeight = 50
+    ClientWidth = 700
+    TabOrder = 1
+    object CheckButton: TButton
+      Left = 1
+      Height = 48
+      Top = 1
+      Width = 698
+      Align = alClient
+      Caption = 'Check'
+      TabOrder = 0
+    end
+  end
+end
