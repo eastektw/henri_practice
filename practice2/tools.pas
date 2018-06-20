@@ -5,9 +5,12 @@ unit tools;
 interface
 
 uses
-  Classes, SysUtils, Dialogs;
+  Classes, SysUtils, Dialogs, Grids;
 
 procedure SplitString(AStringList:TStringList; const Source, Delimiter:String; DelimitNum:Integer=0);
+procedure ValueCopyStringListTo(ATargetStringList, ASourceStringList: TStrings);
+procedure DeleteStringGridRowAt(ARow: Integer; AStringGrid: TStringGrid);
+function CompareTwoStringList(AFirstStringList, ASecondStringList: TStrings): Boolean;
 
 implementation
 
@@ -40,6 +43,44 @@ begin
       if (DelimitNum<>0) and (DelimiterCount=DelimitNum) then break;
     end;
     AStringList.Add(TempString);
+  end;
+end;
+
+procedure ValueCopyStringListTo(ATargetStringList, ASourceStringList: TStrings);
+var
+  Index: Integer;
+begin
+  ATargetStringList.Clear;
+  for Index:=0 to (ASourceStringList.Count-1) do
+  begin
+    ATargetStringList.Add(ASourceStringList[Index]);
+  end;
+end;
+
+procedure DeleteStringGridRowAt(ARow: Integer; AStringGrid: TStringGrid);
+var
+  Index: Integer;
+begin
+  for Index:=ARow to (AStringGrid.RowCount-2) do
+    AStringGrid.Rows[Index].Assign(AStringGrid.Rows[Index+1]);
+  AStringGrid.RowCount:=AStringGrid.RowCount-1;
+end;
+
+function CompareTwoStringList(AFirstStringList, ASecondStringList: TStrings
+  ): Boolean;
+var
+  Index: Integer;
+begin
+  Result:=True;
+
+  if AFirstStringList.Count<>ASecondStringList.Count then
+  begin
+    Result:=False;
+  end
+  else
+  begin
+    for Index:=0 to AFirstStringList.Count-1 do
+    if AFirstStringList[Index]<>ASecondStringList[Index] then Result:=False
   end;
 end;
 

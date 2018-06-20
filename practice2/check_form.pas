@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  Grids, StdCtrls, Types;
+  Grids, StdCtrls, Types, tools;
 
 type
 
@@ -23,7 +23,8 @@ type
   private
 
   public
-    procedure SortCheckStringGridByCol(ACol: Integer);
+    GridCells: Array of Array of TColor;
+    procedure SortCheckStringGridByFirstCol;
   end;
 
 var
@@ -44,27 +45,39 @@ begin
     CheckStringGrid.ColWidths[ColIndex]:=EqualWidth;
 end;
 
-procedure TForm2.SortCheckStringGridByCol(ACol: Integer);
+procedure TForm2.SortCheckStringGridByFirstCol;
 var
-  Strings: TStrings;
-  RowIndex: Integer;
-  TestNum: Extended;
+  MainRowIndex, SubRowIndex: Integer;
+  TempStringList: TStringList;
+  PreHeadIndex, NowHeadIndex: Integer;
 begin
-  Strings:=CheckStringGrid.Cols[ACol];
-  for RowIndex:=0 to (Strings.Count-1) do
+  if CheckStringGrid.RowCount>2 then
   begin
-    if not TryStrToInt(Strings[RowIndex], TestNum) then
+    TempStringList:=TStringList.Create;
+    for MainRowIndex:=(CheckStringGrid.RowCount-1) downto 1 do
     begin
-      ShowMessage('Cannot sort string');
-      Exit;
+      for SubRowIndex:=2 to MainRowIndex do
+      begin
+        PreHeadIndex:=StrToInt(CheckStringGrid.Cells[0,SubRowIndex-1]);
+        NowHeadIndex:=StrToInt(CheckStringGrid.Cells[0,SubRowIndex]);
+        if PreHeadIndex>NowHeadIndex then
+        begin
+          ValueCopyStringListTo(TempStringList, CheckStringGrid.Rows[SubRowIndex-1]);
+          ValueCopyStringListTo(CheckStringGrid.Rows[SubRowIndex-1], CheckStringGrid.Rows[SubRowIndex]);
+          ValueCopyStringListTo(CheckStringGrid.Rows[SubRowIndex], TempStringList);
+        end;
+      end;
     end;
+    TempStringList.Free;
   end;
 end;
 
 procedure TForm2.CheckStringGridDrawCell(Sender: TObject; aCol, aRow: Integer;
   aRect: TRect; aState: TGridDrawState);
 begin
-  CheckStringGrid.Canvas.Brush.Color:=clGreen;
+  SetLength(GridCells, aCol+1);
+  SetLength(GridCells[aCol], aRow+1);
+  GridCells[aCol, aRow]:=CheckStringGrid.Canvas.Brush.Color;
 end;
 
 end.

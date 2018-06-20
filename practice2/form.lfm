@@ -1,7 +1,7 @@
 object Form1: TForm1
-  Left = 725
+  Left = 614
   Height = 550
-  Top = 194
+  Top = 238
   Width = 700
   Caption = 'Form1'
   ClientHeight = 550
@@ -27,9 +27,7 @@ object Form1: TForm1
       ColCount = 7
       ScrollBars = ssAutoVertical
       TabOrder = 0
-      OnEditingDone = StringGrid1EditingDone
-      OnGetEditText = StringGrid1GetEditText
-      OnMouseDown = StringGrid1MouseDown
+      OnDrawCell = StringGrid1DrawCell
       OnSelectCell = StringGrid1SelectCell
       OnSetEditText = StringGrid1SetEditText
     end
@@ -51,6 +49,7 @@ object Form1: TForm1
       Width = 350
       Align = alLeft
       Caption = 'Edit'
+      Enabled = False
       OnClick = EditButtonClick
       TabOrder = 0
     end
@@ -61,6 +60,8 @@ object Form1: TForm1
       Width = 348
       Align = alClient
       Caption = 'SaveButton'
+      Enabled = False
+      OnClick = SaveButtonClick
       TabOrder = 1
     end
   end
@@ -87,11 +88,6 @@ object Form1: TForm1
   end
   object OpenDialog1: TOpenDialog
     left = 328
-    top = 256
-  end
-  object Timer1: TTimer
-    OnTimer = Timer1Timer
-    left = 234
     top = 256
   end
 end
