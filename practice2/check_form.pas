@@ -49,7 +49,8 @@ procedure TForm2.SortCheckStringGridByFirstCol;
 var
   MainRowIndex, SubRowIndex: Integer;
   TempStringList: TStringList;
-  PreHeadIndex, NowHeadIndex: Integer;
+  PreHeadIndex, NowHeadIndex, GridCellsColIndex: Integer;
+  TempColor: TColor;
 begin
   if CheckStringGrid.RowCount>2 then
   begin
@@ -65,6 +66,12 @@ begin
           ValueCopyStringListTo(TempStringList, CheckStringGrid.Rows[SubRowIndex-1]);
           ValueCopyStringListTo(CheckStringGrid.Rows[SubRowIndex-1], CheckStringGrid.Rows[SubRowIndex]);
           ValueCopyStringListTo(CheckStringGrid.Rows[SubRowIndex], TempStringList);
+          for GridCellsColIndex:=0 to (Length(GridCells)-1) do
+          begin
+            TempColor:=GridCells[GridCellsColIndex][SubRowIndex-1];
+            GridCells[GridCellsColIndex][SubRowIndex-1]:=GridCells[GridCellsColIndex][SubRowIndex];
+            GridCells[GridCellsColIndex][SubRowIndex]:=TempColor;
+          end;
         end;
       end;
     end;
@@ -74,10 +81,18 @@ end;
 
 procedure TForm2.CheckStringGridDrawCell(Sender: TObject; aCol, aRow: Integer;
   aRect: TRect; aState: TGridDrawState);
+var
+  LeftGap, TopGap: Integer;
 begin
-  SetLength(GridCells, aCol+1);
-  SetLength(GridCells[aCol], aRow+1);
-  GridCells[aCol, aRow]:=CheckStringGrid.Canvas.Brush.Color;
+  SetLength(GridCells, CheckStringGrid.ColCount);
+  SetLength(GridCells[aCol], CheckStringGrid.RowCount);
+  if GridCells[aCol, aRow]<>clYellow then GridCells[aCol, aRow]:=CheckStringGrid.Canvas.Brush.Color;
+
+  CheckStringGrid.Canvas.Brush.Color:=GridCells[aCol, aRow];
+  CheckStringGrid.Canvas.FillRect(aRect);
+  LeftGap:=5;
+  TopGap:=((aRect.Bottom-aRect.Top)-CheckStringGrid.Canvas.TextHeight(CheckStringGrid.Cells[ACol,ARow])) div 2;
+  CheckStringGrid.Canvas.TextOut(aRect.Left+LeftGap, aRect.Top+TopGap, CheckStringGrid.Cells[ACol,ARow]);
 end;
 
 end.

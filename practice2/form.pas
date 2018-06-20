@@ -66,6 +66,8 @@ begin
 end;
 
 procedure TForm1.EditButtonClick(Sender: TObject);
+var
+  CanSelected: Boolean;
 begin
   if EditButton.Caption=OutEditButtonName then
   begin
@@ -76,6 +78,11 @@ begin
     EditButton.Caption:=InEditButtonName;
     LoadFileButton.Enabled:=False;
     SaveButton.Enabled:=False;
+    //StringGrid1.Selection := TGridRect(Rect(-1, -1, -1, -1));
+    //StringGrid1.ClearSelections;
+    //StringGrid1.Invalidate;
+    CanSelected:=True;
+    StringGrid1SelectCell(self.StringGrid1, -1, -1, CanSelected);
   end
   else
   begin
@@ -117,7 +124,6 @@ procedure TForm1.StringGrid1DrawCell(Sender: TObject; aCol, aRow: Integer;
   aRect: TRect; aState: TGridDrawState);
 var
   OriginValue, CurrentValue: String;
-  IndexInForm2: Integer;
   LeftGap, TopGap: Integer;
 begin
   if EditButton.Caption=InEditButtonName then
@@ -126,14 +132,12 @@ begin
       OriginValue:=ValueInObjectList(StringGrid1, ShapeObjectList, aCol, aRow)
     else
       OriginValue:=StringGrid1.Cells[aCol, aRow];
-    CurrentValue:=StringGrid1.Cells[aCol, aRow];
 
-    IndexInForm2:=Form2.CheckStringGrid.Cols[0].IndexOf(StringGrid1.Rows[ARow][0]);
+    CurrentValue:=StringGrid1.Cells[aCol, aRow];
 
     if OriginValue<>CurrentValue then
     begin
       StringGrid1.Canvas.Brush.Color:=clYellow;
-      //Form2.GridCells[aCol, IndexInForm2]:=clYellow;
     end;
   end;
 
@@ -149,7 +153,7 @@ var
   RowInForm2, StrIsNum: Boolean;
   OriginValue, NumValue: String;
   TestNum: Extended;
-  IndexInForm2: Integer;
+  IndexInForm2, ColIndex: Integer;
 begin
   IndexInForm2:=Form2.CheckStringGrid.Cols[0].IndexOf(StringGrid1.Rows[ARow][0]);
 
@@ -162,18 +166,35 @@ begin
   if StrIsNum then
   begin
     OriginValue:=ValueInObjectList(StringGrid1, ShapeObjectList, ACol, ARow);
-    if (Value<>OriginValue) and (not RowInForm2) then
+
+    if (Value<>OriginValue) then
     begin
-      Form2.CheckStringGrid.RowCount:=Form2.CheckStringGrid.RowCount+1;
-      ValueCopyStringListTo(Form2.CheckStringGrid.Rows[Form2.CheckStringGrid.RowCount-1], StringGrid1.Rows[ARow]);
-      Form2.CheckStringGrid.Cells[ACol, Form2.CheckStringGrid.RowCount-1]:=OriginValue;
-      if Form2.CheckStringGrid.RowCount>2 then Form2.SortCheckStringGridByFirstCol;
+      if not RowInForm2 then
+      begin
+        for ColIndex:=0 to (Form2.CheckStringGrid.ColCount-1) do
+          SetLength(Form2.GridCells[ColIndex], Form2.CheckStringGrid.RowCount+1);
+        Form2.GridCells[aCol, Form2.CheckStringGrid.RowCount]:=clYellow;
+        Form2.CheckStringGrid.RowCount:=Form2.CheckStringGrid.RowCount+1;
+        ValueCopyStringListTo(Form2.CheckStringGrid.Rows[Form2.CheckStringGrid.RowCount-1], StringGrid1.Rows[ARow]);
+        Form2.CheckStringGrid.Cells[ACol, Form2.CheckStringGrid.RowCount-1]:=OriginValue;
+        if Form2.CheckStringGrid.RowCount>2 then Form2.SortCheckStringGridByFirstCol;
+      end
+      else
+      begin
+        Form2.GridCells[aCol, IndexInForm2]:=clYellow;
+        Form2.CheckStringGrid.Invalidate;
+      end;
     end
     else
     if (Value=OriginValue) and RowInForm2 then
     begin
       if CompareTwoStringList(StringGrid1.Rows[ARow], Form2.CheckStringGrid.Rows[IndexInForm2]) then
-         DeleteStringGridRowAt(IndexInForm2, Form2.CheckStringGrid);
+        DeleteStringGridRowAt(IndexInForm2, Form2.CheckStringGrid)
+      else
+      begin
+        Form2.GridCells[aCol, IndexInForm2]:=clWhite;
+        Form2.CheckStringGrid.Invalidate;
+      end;
     end;
   end
   else
@@ -182,8 +203,6 @@ begin
     StringGrid1.Cells[ACol, ARow]:=NumValue;
   end;
 end;
-
-//StringGrid1.MouseToCell(X, Y, ColIndex, RowIndex);
 
 procedure TForm1.StringGrid1SelectCell(Sender: TObject; aCol, aRow: Integer;
   var CanSelect: Boolean);
