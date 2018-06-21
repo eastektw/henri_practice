@@ -23,8 +23,8 @@ type
     StringGrid1: TStringGrid;
     Timer1: TTimer;
 
-    procedure FormDestroy(Sender: TObject);
     procedure FormResize(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
     procedure LoadFileButtonClick(Sender: TObject);
     procedure EditButtonClick(Sender: TObject);
     procedure SaveButtonClick(Sender: TObject);
@@ -40,6 +40,7 @@ type
   public
     procedure ShapeObjectListToStringGrid(AObjectList:TObjectList; AStringGrid:TStringGrid);
     procedure WriteValueToObjectList(AStringValue: String; AObjectList: TObjectList; const ACol, ARow: Integer);
+    procedure UpdateShapeObjectListByForm2(AShapeObjectList: TObjectList);
     function ValueInObjectList(AObjectList: TObjectList; const ACol, ARow: Integer): String;
   end;
 
@@ -52,7 +53,7 @@ const
 
 var
   Form1: TForm1;
-  ShapeObjectList:TObjectList;
+  FormShapeObjectList:TObjectList;
 
 implementation
 
@@ -71,7 +72,7 @@ end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
-  ShapeObjectList.Free;
+  FormShapeObjectList.Free;
 end;
 
 procedure TForm1.LoadFileButtonClick(Sender: TObject);
@@ -81,24 +82,21 @@ begin
   if OpenDialog1.Execute then
   begin
     try
-      ShapeObjectList.Free;
       FileName:=OpenDialog1.FileName;
-      ShapeObjectList:=TObjectList.Create;
+      FormShapeObjectList:=TObjectList.Create;
       ReadFileIntoObjecList(FileName, ShapeObjectList, ExpandValue);
-      ShapeObjectListToStringGrid(ShapeObjectList, StringGrid1);
+      CloneShapeObjectListTo(FormShapeObjectList, ShapeObjectList);
+      ShapeObjectListToStringGrid(FormShapeObjectList, StringGrid1);
       EditButton.Enabled:=True;
       SaveButton.Enabled:=True;
     except
       exit;
-      ShapeObjectList.Free;
+      FormShapeObjectList.Free;
     end;
   end;
 end;
 
 procedure TForm1.EditButtonClick(Sender: TObject);
-var
-  RowIndexInForm2, ColIndexInForm2: Integer;
-  RowIndexInForm1, ColIndexInForm1: Integer;
 begin
   if EditButton.Caption=OutEditButtonName then
   begin
@@ -118,18 +116,7 @@ begin
     EditButton.Caption:=OutEditButtonName;
     LoadFileButton.Enabled:=True;
     SaveButton.Enabled:=True;
-    for ColIndexInForm2:=0 to (Form2.CheckStringGrid.ColCount-1) do
-    begin
-      for RowIndexInForm2:=0 to (Form2.CheckStringGrid.RowCount-1) do
-      begin
-        if Form2.GridCells[ColIndexInForm2][RowIndexInForm2]=clYellow then
-        begin
-          ColIndexInForm1:=ColIndexInForm2;
-          RowIndexInForm1:=StrToInt(Form2.CheckStringGrid.Cells[0, RowIndexInForm2]);
-          WriteValueToObjectList(StringGrid1.Cells[ColIndexInForm1, RowIndexInForm1], ShapeObjectList, ColIndexInForm1, RowIndexInForm1);
-        end;
-      end;
-    end;
+    UpdateShapeObjectListByForm2(FormShapeObjectList);
     Form2.DefaultCheckStringGrid;
     StringGrid1.Invalidate;
   end;
@@ -143,6 +130,7 @@ begin
   begin
     try
       FileName:=OpenDialog1.FileName;
+      CloneShapeObjectListTo(ShapeObjectList, FormShapeObjectList);
       WriteObjectListIntoFile(FileName, ShapeObjectList, ExpandValue);
     except
       exit;
@@ -160,7 +148,7 @@ begin
   begin
     if (aCol>0) and (aRow>0) then
     begin
-      OriginValue:=ValueInObjectList(ShapeObjectList, aCol, aRow);
+      OriginValue:=ValueInObjectList(FormShapeObjectList, aCol, aRow);
       CurrentValue:=StringGrid1.Cells[aCol, aRow];
       if OriginValue<>CurrentValue then
         StringGrid1.Canvas.Brush.Color:=clYellow;
@@ -219,7 +207,7 @@ begin
   StrIsNum:=TryStrToFloat(Value, TestNum);
   if StrIsNum then
   begin
-    OriginValue:=ValueInObjectList(ShapeObjectList, ACol, ARow);
+    OriginValue:=ValueInObjectList(FormShapeObjectList, ACol, ARow);
 
     if (Value<>OriginValue) then
     begin
@@ -260,7 +248,7 @@ begin
     EditButton.Caption:=OutEditButtonName;
     SaveButton.Enabled:=True;
     LoadFileButton.Enabled:=True;
-    ShapeObjectListToStringGrid(ShapeObjectList, StringGrid1);
+    ShapeObjectListToStringGrid(FormShapeObjectList, StringGrid1);
     StringGrid1.Invalidate;
     Timer1.Enabled:=False;
   end;
@@ -335,6 +323,25 @@ begin
     else if ACol=6 then TempLineObject.Radius:=NumValue;
     TempLineObject.StartPoint:=TempPoint1;
     TempLineObject.EndPoint:=TempPoint2;
+  end;
+end;
+
+procedure TForm1.UpdateShapeObjectListByForm2(AShapeObjectList: TObjectList);
+var
+  RowIndexInForm2, ColIndexInForm2: Integer;
+  RowIndexInForm1, ColIndexInForm1: Integer;
+begin
+  for ColIndexInForm2:=0 to (Form2.CheckStringGrid.ColCount-1) do
+  begin
+    for RowIndexInForm2:=0 to (Form2.CheckStringGrid.RowCount-1) do
+    begin
+      if Form2.GridCells[ColIndexInForm2][RowIndexInForm2]=clYellow then
+      begin
+        ColIndexInForm1:=ColIndexInForm2;
+        RowIndexInForm1:=StrToInt(Form2.CheckStringGrid.Cells[0, RowIndexInForm2]);
+        WriteValueToObjectList(StringGrid1.Cells[ColIndexInForm1, RowIndexInForm1], AShapeObjectList, ColIndexInForm1, RowIndexInForm1);
+      end;
+    end;
   end;
 end;
 

@@ -5,7 +5,7 @@ unit tools;
 interface
 
 uses
-  Classes, SysUtils, Dialogs, Grids;
+  Classes, SysUtils, Dialogs, Grids, contnrs;
 
 procedure SplitString(AStringList:TStringList; const Source, Delimiter:String; DelimitNum:Integer=0);
 procedure ValueCopyStringListTo(ATargetStringList, ASourceStringList: TStrings);

@@ -69,8 +69,11 @@ type
   procedure ReadFileIntoObjecList(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer);
   procedure WriteObjectListIntoFile(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer);
   procedure ClearEmptyStringElement(AStringList:TStringList);
+  procedure CloneShapeObjectListTo(ATargetShapeObjectList, ASourceShapeObjectList: TObjectList);
   function IsStringListNum(AStringList:TStringList):Boolean;
 
+var
+  ShapeObjectList:TObjectList;
 
 implementation
 
@@ -91,6 +94,7 @@ begin
   try
     AssignFile(FileHandle, AFileName);
     Reset(FileHandle);
+    AObjectList.Clear;
     try
       while not EOF(FileHandle) do
       begin
@@ -135,6 +139,41 @@ begin
     end;
   except
     ShowMessage('Error, cannot open the file name you assign');
+  end;
+end;
+
+procedure CloneShapeObjectListTo(ATargetShapeObjectList,
+  ASourceShapeObjectList: TObjectList);
+var
+  TempPointObject: TPointShape;
+  TempLineObject: TLineShape;
+  TempShapeName: TShapeType;
+  TempPoint1, TempPoint2: TPoint;
+  TempRadius: Integer;
+  Index: Integer;
+begin
+  ATargetShapeObjectList.Clear;
+
+  for Index:=0 to (ASourceShapeObjectList.Count-1) do
+  begin
+    if ASourceShapeObjectList[Index] is TPointShape then
+    begin
+      TempShapeName:=PointType;
+      TempPoint1:=TPoint.Create(TPointShape(ASourceShapeObjectList[Index]).Point.x, TPointShape(ASourceShapeObjectList[Index]).Point.y);
+      TempRadius:=TPointShape(ASourceShapeObjectList[Index]).Radius;
+      TempPointObject:=TPointShape.create(TempShapeName, TempPoint1, TempRadius);
+      ATargetShapeObjectList.Add(TempPointObject);
+    end
+    else
+    if ASourceShapeObjectList[Index] is TLineShape then
+    begin
+      TempShapeName:=LineType;
+      TempPoint1:=TPoint.Create(TLineShape(ASourceShapeObjectList[Index]).StartPoint.x, TLineShape(ASourceShapeObjectList[Index]).StartPoint.y);
+      TempPoint2:=TPoint.Create(TLineShape(ASourceShapeObjectList[Index]).EndPoint.y, TLineShape(ASourceShapeObjectList[Index]).EndPoint.y);
+      TempRadius:=TLineShape(ASourceShapeObjectList[Index]).Radius;
+      TempLineObject:=TLineShape.create(TempShapeName, TempPoint1, TempPoint2, TempRadius);
+      ATargetShapeObjectList.Add(TempLineObject);
+    end;
   end;
 end;
 
