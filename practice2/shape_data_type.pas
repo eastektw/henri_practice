@@ -66,13 +66,15 @@ type
       constructor create(AName:TShapeType; AStartPoint, AEndPoint:TPoint; ARadius:Integer);
   end;
 
-  function ReadFileIntoObjecList(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer):Boolean;
-  function IsStringListNum(AStringList:TStringList):Boolean;
+  procedure ReadFileIntoObjecList(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer);
+  procedure WriteObjectListIntoFile(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer);
   procedure ClearEmptyStringElement(AStringList:TStringList);
+  function IsStringListNum(AStringList:TStringList):Boolean;
+
 
 implementation
 
-function ReadFileIntoObjecList(AFileName: String; AObjectList: TObjectList; const ExpandValue: Integer): Boolean;
+procedure ReadFileIntoObjecList(AFileName: String; AObjectList: TObjectList; const ExpandValue: Integer);
 const
   PointName='#P';
   LineName='#L';
@@ -128,13 +130,11 @@ begin
           TempStringList.Free;
         end;
       end;
-      Result:=True;
     finally
       CloseFile(FileHandle);
     end;
   except
     ShowMessage('Error, cannot open the file name you assign');
-    Result:=False;
   end;
 end;
 
@@ -151,6 +151,53 @@ begin
     Result:=True;
   except
     Result:=False;
+  end;
+end;
+
+procedure WriteObjectListIntoFile(AFileName: String; AObjectList: TObjectList;
+  const ExpandValue: Integer);
+const
+  PointName='#P';
+  LineName='#L';
+var
+  FileHandler:TextFile;
+  Index:Integer;
+  TempPointObject:TPointShape;
+  TempLineObject:TLineShape;
+begin
+  try
+    AssignFile(FileHandler, AFileName);
+  except
+    Exit;
+  end;
+
+  try
+    Rewrite(FileHandler);
+    for Index:=0 to (AObjectList.Count-1) do
+    begin
+      if AObjectList[Index] is TPointShape then
+      begin
+        TempPointObject:=TPointShape(AObjectList[Index]);
+        Write(FileHandler, PointName + ' ');
+        Write(FileHandler, FloatToStr(TempPointObject.Point.x / ExpandValue) + ' ');
+        Write(FileHandler, FloatToStr(TempPointObject.Point.y / ExpandValue) + ' ');
+        Write(FileHandler, FloatToStr(TempPointObject.Radius / ExpandValue));
+        WriteLn(FileHandler);
+      end
+      else if AObjectList[Index] is TLineShape then
+      begin
+        TempLineObject:=TLineShape(AObjectList[Index]);
+        Write(FileHandler, LineName + ' ');
+        Write(FileHandler, FloatToStr(TempLineObject.StartPoint.x / ExpandValue) + ' ');
+        Write(FileHandler, FloatToStr(TempLineObject.StartPoint.y / ExpandValue) + ' ');
+        Write(FileHandler, FloatToStr(TempLineObject.EndPoint.x / ExpandValue) + ' ');
+        Write(FileHandler, FloatToStr(TempLineObject.EndPoint.y / ExpandValue) + ' ');
+        Write(FileHandler, FloatToStr(TempPointObject.Radius / ExpandValue));
+        WriteLn(FileHandler);
+      end;
+    end;
+  finally
+    CloseFile(FileHandler);
   end;
 end;
 

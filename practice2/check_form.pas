@@ -6,25 +6,28 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  Grids, StdCtrls, Types, tools;
+  Grids, StdCtrls, Types, tools, LCLProc;
 
 type
 
   { TForm2 }
 
   TForm2 = class(TForm)
-    CheckButton: TButton;
+    CancelButton: TButton;
     StringGridPanel: TPanel;
     ButtonPanel: TPanel;
     CheckStringGrid: TStringGrid;
+    procedure CancelButtonClick(Sender: TObject);
     procedure CheckStringGridDrawCell(Sender: TObject; aCol, aRow: Integer;
       aRect: TRect; aState: TGridDrawState);
     procedure FormResize(Sender: TObject);
+    procedure FormShow(Sender: TObject);
   private
 
   public
     GridCells: Array of Array of TColor;
     procedure SortCheckStringGridByFirstCol;
+    procedure DefaultCheckStringGrid;
   end;
 
 var
@@ -79,20 +82,40 @@ begin
   end;
 end;
 
+procedure TForm2.DefaultCheckStringGrid;
+var
+  ColIndex: Integer;
+begin
+  CleanStringGrid(CheckStringGrid);
+  CheckStringGrid.RowCount:=1;
+  SetLength(GridCells, CheckStringGrid.ColCount);
+  for ColIndex:=0 to (Length(GridCells)-1) do
+    SetLength(GridCells[ColIndex], 1);
+end;
+
 procedure TForm2.CheckStringGridDrawCell(Sender: TObject; aCol, aRow: Integer;
   aRect: TRect; aState: TGridDrawState);
 var
   LeftGap, TopGap: Integer;
 begin
-  SetLength(GridCells, CheckStringGrid.ColCount);
-  SetLength(GridCells[aCol], CheckStringGrid.RowCount);
+  DebuglnThreadLog('CheckStringGridDrawCell');
   if GridCells[aCol, aRow]<>clYellow then GridCells[aCol, aRow]:=CheckStringGrid.Canvas.Brush.Color;
-
   CheckStringGrid.Canvas.Brush.Color:=GridCells[aCol, aRow];
   CheckStringGrid.Canvas.FillRect(aRect);
   LeftGap:=5;
   TopGap:=((aRect.Bottom-aRect.Top)-CheckStringGrid.Canvas.TextHeight(CheckStringGrid.Cells[ACol,ARow])) div 2;
   CheckStringGrid.Canvas.TextOut(aRect.Left+LeftGap, aRect.Top+TopGap, CheckStringGrid.Cells[ACol,ARow]);
+end;
+
+procedure TForm2.CancelButtonClick(Sender: TObject);
+begin
+  Self.Hide;
+end;
+
+procedure TForm2.FormShow(Sender: TObject);
+begin
+  DefaultCheckStringGrid;
+  FormResize(Self);
 end;
 
 end.

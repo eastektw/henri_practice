@@ -10,6 +10,7 @@ uses
 procedure SplitString(AStringList:TStringList; const Source, Delimiter:String; DelimitNum:Integer=0);
 procedure ValueCopyStringListTo(ATargetStringList, ASourceStringList: TStrings);
 procedure DeleteStringGridRowAt(ARow: Integer; AStringGrid: TStringGrid);
+procedure CleanStringGrid(AStringGrid: TStringGrid);
 function CompareTwoStringList(AFirstStringList, ASecondStringList: TStrings): Boolean;
 
 implementation
@@ -64,6 +65,15 @@ begin
   for Index:=ARow to (AStringGrid.RowCount-2) do
     AStringGrid.Rows[Index].Assign(AStringGrid.Rows[Index+1]);
   AStringGrid.RowCount:=AStringGrid.RowCount-1;
+end;
+
+procedure CleanStringGrid(AStringGrid: TStringGrid);
+var
+  ColIndex: Integer;
+begin
+  for ColIndex:=0 to (AStringGrid.ColCount-1) do
+    AStringGrid.Cols[ColIndex].Clear;
+  AStringGrid.RowCount:=0;
 end;
 
 function CompareTwoStringList(AFirstStringList, ASecondStringList: TStrings

@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  Grids, StdCtrls, Types, Contnrs, shape_data_type, check_form, tools;
+  Grids, StdCtrls, Types, Contnrs, shape_data_type, check_form, tools, LCLProc;
 
 type
 
@@ -21,10 +21,12 @@ type
     OperatedButtonPanel: TPanel;
     LoadFileButtonPanel: TPanel;
     StringGrid1: TStringGrid;
+    Timer1: TTimer;
 
-    procedure EditButtonClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
     procedure FormResize(Sender: TObject);
     procedure LoadFileButtonClick(Sender: TObject);
+    procedure EditButtonClick(Sender: TObject);
     procedure SaveButtonClick(Sender: TObject);
     procedure StringGrid1DrawCell(Sender: TObject; aCol, aRow: Integer;
       aRect: TRect; aState: TGridDrawState);
@@ -32,17 +34,19 @@ type
       var CanSelect: Boolean);
     procedure StringGrid1SetEditText(Sender: TObject; ACol, ARow: Integer;
       const Value: string);
+    procedure Timer1Timer(Sender: TObject);
   private
 
   public
     procedure ShapeObjectListToStringGrid(AObjectList:TObjectList; AStringGrid:TStringGrid);
-    function ValueInObjectList(AStringGrid: TStringGrid; AObjectList: TObjectList; const ACol, ARow: Integer): String;
+    procedure WriteValueToObjectList(AStringValue: String; AObjectList: TObjectList; const ACol, ARow: Integer);
+    function ValueInObjectList(AObjectList: TObjectList; const ACol, ARow: Integer): String;
   end;
 
 const
   ExpandValue=10000000;
-  PointName='#P';
-  LineName='#L';
+  PointName='P';
+  LineName='L';
   InEditButtonName='End Edit';
   OutEditButtonName='Edit';
 
@@ -65,47 +69,22 @@ begin
     StringGrid1.ColWidths[ColIndex]:=EqualWidth;
 end;
 
-procedure TForm1.EditButtonClick(Sender: TObject);
-var
-  CanSelected: Boolean;
+procedure TForm1.FormDestroy(Sender: TObject);
 begin
-  if EditButton.Caption=OutEditButtonName then
-  begin
-    StringGrid1.Options:=StringGrid1.Options+[GoEditing];
-    Form2.Show;
-    Form2.Left:=Form1.Left+Form1.Width;
-    Form2.Top:=Form1.Top;
-    EditButton.Caption:=InEditButtonName;
-    LoadFileButton.Enabled:=False;
-    SaveButton.Enabled:=False;
-    //StringGrid1.Selection := TGridRect(Rect(-1, -1, -1, -1));
-    //StringGrid1.ClearSelections;
-    //StringGrid1.Invalidate;
-    CanSelected:=True;
-    StringGrid1SelectCell(self.StringGrid1, -1, -1, CanSelected);
-  end
-  else
-  begin
-    StringGrid1.Options:=StringGrid1.Options-[GoEditing];
-    Form2.Hide;
-    EditButton.Caption:=OutEditButtonName;
-    LoadFileButton.Enabled:=True;
-    SaveButton.Enabled:=True;
-  end;
+  ShapeObjectList.Free;
 end;
 
 procedure TForm1.LoadFileButtonClick(Sender: TObject);
 var
   FileName:String;
-  State:Boolean;
 begin
   if OpenDialog1.Execute then
   begin
     try
+      ShapeObjectList.Free;
       FileName:=OpenDialog1.FileName;
       ShapeObjectList:=TObjectList.Create;
-      State:=True;
-      if State then State:=ReadFileIntoObjecList(FileName, ShapeObjectList, ExpandValue);
+      ReadFileIntoObjecList(FileName, ShapeObjectList, ExpandValue);
       ShapeObjectListToStringGrid(ShapeObjectList, StringGrid1);
       EditButton.Enabled:=True;
       SaveButton.Enabled:=True;
@@ -116,8 +95,59 @@ begin
   end;
 end;
 
-procedure TForm1.SaveButtonClick(Sender: TObject);
+procedure TForm1.EditButtonClick(Sender: TObject);
+var
+  RowIndexInForm2, ColIndexInForm2: Integer;
+  RowIndexInForm1, ColIndexInForm1: Integer;
 begin
+  if EditButton.Caption=OutEditButtonName then
+  begin
+    StringGrid1.Options:=StringGrid1.Options+[GoEditing];
+    Form2.Show;
+    Form2.Left:=Form1.Left+Form1.Width;
+    Form2.Top:=Form1.Top;
+    EditButton.Caption:=InEditButtonName;
+    LoadFileButton.Enabled:=False;
+    SaveButton.Enabled:=False;
+    Timer1.Enabled:=True;
+  end
+  else
+  begin
+    StringGrid1.Options:=StringGrid1.Options-[GoEditing];
+    Form2.Hide;
+    EditButton.Caption:=OutEditButtonName;
+    LoadFileButton.Enabled:=True;
+    SaveButton.Enabled:=True;
+    for ColIndexInForm2:=0 to (Form2.CheckStringGrid.ColCount-1) do
+    begin
+      for RowIndexInForm2:=0 to (Form2.CheckStringGrid.RowCount-1) do
+      begin
+        if Form2.GridCells[ColIndexInForm2][RowIndexInForm2]=clYellow then
+        begin
+          ColIndexInForm1:=ColIndexInForm2;
+          RowIndexInForm1:=StrToInt(Form2.CheckStringGrid.Cells[0, RowIndexInForm2]);
+          WriteValueToObjectList(StringGrid1.Cells[ColIndexInForm1, RowIndexInForm1], ShapeObjectList, ColIndexInForm1, RowIndexInForm1);
+        end;
+      end;
+    end;
+    Form2.DefaultCheckStringGrid;
+    StringGrid1.Invalidate;
+  end;
+end;
+
+procedure TForm1.SaveButtonClick(Sender: TObject);
+var
+  FileName:String;
+begin
+  if OpenDialog1.Execute then
+  begin
+    try
+      FileName:=OpenDialog1.FileName;
+      WriteObjectListIntoFile(FileName, ShapeObjectList, ExpandValue);
+    except
+      exit;
+    end;
+  end;
 end;
 
 procedure TForm1.StringGrid1DrawCell(Sender: TObject; aCol, aRow: Integer;
@@ -129,16 +159,18 @@ begin
   if EditButton.Caption=InEditButtonName then
   begin
     if (aCol>0) and (aRow>0) then
-      OriginValue:=ValueInObjectList(StringGrid1, ShapeObjectList, aCol, aRow)
-    else
-      OriginValue:=StringGrid1.Cells[aCol, aRow];
-
-    CurrentValue:=StringGrid1.Cells[aCol, aRow];
-
-    if OriginValue<>CurrentValue then
     begin
-      StringGrid1.Canvas.Brush.Color:=clYellow;
+      OriginValue:=ValueInObjectList(ShapeObjectList, aCol, aRow);
+      CurrentValue:=StringGrid1.Cells[aCol, aRow];
+      if OriginValue<>CurrentValue then
+        StringGrid1.Canvas.Brush.Color:=clYellow;
     end;
+  end
+  else
+  if EditButton.Caption=OutEditButtonName then
+  begin
+    if (aCol>0) and (aRow>0) then
+      StringGrid1.Canvas.Brush.Color:=clWhite;
   end;
 
   StringGrid1.Canvas.FillRect(aRect);
@@ -147,32 +179,54 @@ begin
   StringGrid1.Canvas.TextOut(aRect.Left+LeftGap, aRect.Top+TopGap, StringGrid1.Cells[ACol,ARow]);
 end;
 
+procedure TForm1.StringGrid1SelectCell(Sender: TObject; aCol, aRow: Integer;
+  var CanSelect: Boolean);
+var
+  ShapeName: String;
+begin
+  if EditButton.Caption=InEditButtonName then
+  begin
+    if (aCol>0) and (aRow>0) then
+    begin
+      ShapeName:=StringGrid1.Cells[1, aRow];
+
+      if ShapeName=PointName then
+        if (aCol=1) or (aCol>4) then StringGrid1.Options:=StringGrid1.Options-[goEditing]
+        else StringGrid1.Options:=StringGrid1.Options+[goEditing]
+      else
+      if ShapeName=LineName then
+        if (aCol=1) or (aCol>6) then StringGrid1.Options:=StringGrid1.Options-[goEditing]
+        else StringGrid1.Options:=StringGrid1.Options+[goEditing];
+    end;
+  end;
+end;
+
 procedure TForm1.StringGrid1SetEditText(Sender: TObject; ACol, ARow: Integer;
   const Value: string);
 var
-  RowInForm2, StrIsNum: Boolean;
-  OriginValue, NumValue: String;
+  CellInForm2, StrIsNum: Boolean;
+  OriginValue, NumString: String;
   TestNum: Extended;
-  IndexInForm2, ColIndex: Integer;
+  RowIndexInForm2, ColIndexInForm2: Integer;
 begin
-  IndexInForm2:=Form2.CheckStringGrid.Cols[0].IndexOf(StringGrid1.Rows[ARow][0]);
+  RowIndexInForm2:=Form2.CheckStringGrid.Cols[0].IndexOf(StringGrid1.Rows[ARow][0]);
 
-  if IndexInForm2=-1 then
-    RowInForm2:=False
+  if RowIndexInForm2=-1 then
+    CellInForm2:=False
   else
-    RowInForm2:=True;
+    CellInForm2:=True;
 
   StrIsNum:=TryStrToFloat(Value, TestNum);
   if StrIsNum then
   begin
-    OriginValue:=ValueInObjectList(StringGrid1, ShapeObjectList, ACol, ARow);
+    OriginValue:=ValueInObjectList(ShapeObjectList, ACol, ARow);
 
     if (Value<>OriginValue) then
     begin
-      if not RowInForm2 then
+      if not CellInForm2 then
       begin
-        for ColIndex:=0 to (Form2.CheckStringGrid.ColCount-1) do
-          SetLength(Form2.GridCells[ColIndex], Form2.CheckStringGrid.RowCount+1);
+        for ColIndexInForm2:=0 to (Form2.CheckStringGrid.ColCount-1) do
+          SetLength(Form2.GridCells[ColIndexInForm2], Form2.CheckStringGrid.RowCount+1);
         Form2.GridCells[aCol, Form2.CheckStringGrid.RowCount]:=clYellow;
         Form2.CheckStringGrid.RowCount:=Form2.CheckStringGrid.RowCount+1;
         ValueCopyStringListTo(Form2.CheckStringGrid.Rows[Form2.CheckStringGrid.RowCount-1], StringGrid1.Rows[ARow]);
@@ -180,46 +234,35 @@ begin
         if Form2.CheckStringGrid.RowCount>2 then Form2.SortCheckStringGridByFirstCol;
       end
       else
-      begin
-        Form2.GridCells[aCol, IndexInForm2]:=clYellow;
-        Form2.CheckStringGrid.Invalidate;
-      end;
+        Form2.GridCells[aCol, RowIndexInForm2]:=clYellow;
     end
     else
-    if (Value=OriginValue) and RowInForm2 then
+    if (Value=OriginValue) and CellInForm2 then
     begin
-      if CompareTwoStringList(StringGrid1.Rows[ARow], Form2.CheckStringGrid.Rows[IndexInForm2]) then
-        DeleteStringGridRowAt(IndexInForm2, Form2.CheckStringGrid)
+      if CompareTwoStringList(StringGrid1.Rows[ARow], Form2.CheckStringGrid.Rows[RowIndexInForm2]) then
+        DeleteStringGridRowAt(RowIndexInForm2, Form2.CheckStringGrid)
       else
-      begin
-        Form2.GridCells[aCol, IndexInForm2]:=clWhite;
-        Form2.CheckStringGrid.Invalidate;
-      end;
+        Form2.GridCells[aCol, RowIndexInForm2]:=clWhite;
     end;
+    Form2.CheckStringGrid.Invalidate;
   end
   else
   begin
-    NumValue:=Copy(Value, 0, Length(Value)-1);
-    StringGrid1.Cells[ACol, ARow]:=NumValue;
+    NumString:=Copy(Value, 0, Length(Value)-1);
+    StringGrid1.Cells[ACol, ARow]:=NumString;
   end;
 end;
 
-procedure TForm1.StringGrid1SelectCell(Sender: TObject; aCol, aRow: Integer;
-  var CanSelect: Boolean);
-var
-  ShapeName: String;
+procedure TForm1.Timer1Timer(Sender: TObject);
 begin
-  ShapeName:=StringGrid1.Cells[1, aRow];
-
-  if EditButton.Caption=InEditButtonName then
+  if (EditButton.Caption=InEditButtonName) and (not Form2.Showing) then
   begin
-    if ShapeName=PointName then
-      if (aCol=1) or (aCol>4) then StringGrid1.Options:=StringGrid1.Options-[goEditing]
-      else StringGrid1.Options:=StringGrid1.Options+[goEditing]
-    else
-    if ShapeName=LineName then
-      if (aCol=1) or (aCol>6) then StringGrid1.Options:=StringGrid1.Options-[goEditing]
-      else StringGrid1.Options:=StringGrid1.Options+[goEditing];
+    EditButton.Caption:=OutEditButtonName;
+    SaveButton.Enabled:=True;
+    LoadFileButton.Enabled:=True;
+    ShapeObjectListToStringGrid(ShapeObjectList, StringGrid1);
+    StringGrid1.Invalidate;
+    Timer1.Enabled:=False;
   end;
 end;
 
@@ -258,15 +301,51 @@ begin
   end;
 end;
 
-function TForm1.ValueInObjectList(AStringGrid: TStringGrid;
-  AObjectList: TObjectList; const ACol, ARow: Integer): String;
+procedure TForm1.WriteValueToObjectList(AStringValue: String;
+  AObjectList: TObjectList; const ACol, ARow: Integer);
+var
+  ShapeName: String;
+  NumValue: Integer;
+  TempPoint1, TempPoint2: TPoint;
+  TempPointObject: TPointShape;
+  TempLineObject: TLineShape;
+begin
+  ShapeName:=StringGrid1.Cells[1, ARow];
+  NumValue:=trunc(StrToFloat(AStringValue)*ExpandValue);
+
+  if ShapeName=PointName then
+  begin
+    TempPointObject:=TPointShape(AObjectList[ARow-1]);
+    TempPoint1:=TPointShape(AObjectList[ARow-1]).Point;
+    if ACol=2 then TempPoint1.x:=NumValue
+    else if ACol=3 then TempPoint1.y:=NumValue
+    else if ACol=4 then TempPointObject.Radius:=NumValue;
+    TempPointObject.Point:=TempPoint1;
+  end
+  else
+  if ShapeName=LineName then
+  begin
+    TempLineObject:=TLineShape(AObjectList[ARow-1]);
+    TempPoint1:=TLineShape(AObjectList[ARow-1]).StartPoint;
+    TempPoint2:=TLineShape(AObjectList[ARow-1]).EndPoint;
+    if ACol=2 then TempPoint1.x:=NumValue
+    else if ACol=3 then TempPoint1.y:=NumValue
+    else if ACol=4 then TempPoint2.x:=NumValue
+    else if ACol=5 then TempPoint2.y:=NumValue
+    else if ACol=6 then TempLineObject.Radius:=NumValue;
+    TempLineObject.StartPoint:=TempPoint1;
+    TempLineObject.EndPoint:=TempPoint2;
+  end;
+end;
+
+function TForm1.ValueInObjectList(AObjectList: TObjectList; const ACol, ARow: Integer): String;
 var
   ObjectName: String;
   TempObject: TShape;
 begin
-  if (ACol<AStringGrid.ColCount) and (ARow<AStringGrid.RowCount) then
+  if (ACol<StringGrid1.ColCount) and (ARow<StringGrid1.RowCount) then
   begin
-    ObjectName:=AStringGrid.Cells[1, ARow];
+    ObjectName:=StringGrid1.Cells[1, ARow];
     TempObject:=TShape(AObjectList[ARow-1]);
     if Length(ObjectName)<>0 then
     begin
