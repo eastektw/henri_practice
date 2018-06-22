@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  Grids, StdCtrls, Types, tools, LCLProc;
+  Grids, StdCtrls, Types, tools;
 
 type
 
@@ -98,7 +98,6 @@ procedure TForm2.CheckStringGridDrawCell(Sender: TObject; aCol, aRow: Integer;
 var
   LeftGap, TopGap: Integer;
 begin
-  DebuglnThreadLog('CheckStringGridDrawCell');
   if GridCells[aCol, aRow]<>clYellow then GridCells[aCol, aRow]:=CheckStringGrid.Canvas.Brush.Color;
   CheckStringGrid.Canvas.Brush.Color:=GridCells[aCol, aRow];
   CheckStringGrid.Canvas.FillRect(aRect);

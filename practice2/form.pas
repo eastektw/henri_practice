@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  Grids, StdCtrls, Types, Contnrs, shape_data_type, check_form, tools, LCLProc;
+  Grids, StdCtrls, Types, Contnrs, shape_data_type, check_form, tools, math;
 
 type
 
@@ -73,6 +73,7 @@ end;
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
   FormShapeObjectList.Free;
+  ShapeObjectList.Free;
 end;
 
 procedure TForm1.LoadFileButtonClick(Sender: TObject);
@@ -84,6 +85,7 @@ begin
     try
       FileName:=OpenDialog1.FileName;
       FormShapeObjectList:=TObjectList.Create;
+      ShapeObjectList:=TObjectList.Create;
       ReadFileIntoObjecList(FileName, ShapeObjectList, ExpandValue);
       CloneShapeObjectListTo(FormShapeObjectList, ShapeObjectList);
       ShapeObjectListToStringGrid(FormShapeObjectList, StringGrid1);
@@ -92,6 +94,7 @@ begin
     except
       exit;
       FormShapeObjectList.Free;
+      ShapeObjectList.Free;
     end;
   end;
 end;
@@ -191,6 +194,9 @@ end;
 
 procedure TForm1.StringGrid1SetEditText(Sender: TObject; ACol, ARow: Integer;
   const Value: string);
+const
+  UpperBound=100.0;
+  lowerBound=(-100.0);
 var
   CellInForm2, StrIsNum: Boolean;
   OriginValue, NumString: String;
@@ -207,6 +213,18 @@ begin
   StrIsNum:=TryStrToFloat(Value, TestNum);
   if StrIsNum then
   begin
+    if (CompareValue(TestNum, UpperBound)=1) then
+    begin
+      ShowMessage('the upper bound is 100');
+      StringGrid1.Cells[ACol, ARow]:='100';
+    end
+    else
+    if (CompareValue(TestNum, lowerBound)=-1) then
+    begin
+      ShowMessage('the lower bound is -100');
+      StringGrid1.Cells[ACol, ARow]:='-100';
+    end;
+
     OriginValue:=ValueInObjectList(FormShapeObjectList, ACol, ARow);
 
     if (Value<>OriginValue) then
@@ -237,6 +255,7 @@ begin
   else
   begin
     NumString:=Copy(Value, 0, Length(Value)-1);
+    if Length(Value)=0 then NumString:='0';
     StringGrid1.Cells[ACol, ARow]:=NumString;
   end;
 end;

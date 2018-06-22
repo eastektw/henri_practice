@@ -89,12 +89,10 @@ var
   ShapeName:TShapeType;
   ShapeRadius:LongInt;
   Point1, Point2:TPoint;
-  Index:integer;
 begin
   try
     AssignFile(FileHandle, AFileName);
     Reset(FileHandle);
-    AObjectList.Clear;
     try
       while not EOF(FileHandle) do
       begin
@@ -180,7 +178,7 @@ end;
 function IsStringListNum(AStringList: TStringList): Boolean;
 var
   Index:Integer;
-  TempNum:Extended;
+  TempNum: Extended;
 begin
   try
     for Index:=0 to (AStringList.Count-1) do
