@@ -8,6 +8,7 @@ uses
   Classes, SysUtils, Dialogs, Grids;
 
 procedure SplitString(AStringList:TStringList; const Source, Delimiter:String; DelimitNum:Integer=0);
+procedure RemoveStringFrom(AStringList:TStringList; const AString:String);
 procedure ValueCopyStringListTo(ATargetStringList, ASourceStringList: TStrings);
 procedure DeleteStringGridRowAt(ARow: Integer; AStringGrid: TStringGrid);
 procedure CleanStringGrid(AStringGrid: TStringGrid);
@@ -44,6 +45,17 @@ begin
       if (DelimitNum<>0) and (DelimiterCount=DelimitNum) then break;
     end;
     AStringList.Add(TempString);
+  end;
+end;
+
+procedure RemoveStringFrom(AStringList: TStringList; const AString: String);
+var
+  Index:Integer;
+begin
+  for Index:=(AStringList.Count-1) downto 0 do
+  begin
+    if AStringList[Index]=AString then
+       AStringList.Delete(Index);
   end;
 end;
 

@@ -9,11 +9,9 @@ uses
 
 type
   { TShapeType }
-
   TShapeType = (None, PointType, LineType);
 
   { TShape }
-
   TShape=class
     private
       NName:TShapeType;
@@ -27,10 +25,9 @@ type
   end;
 
   { TPointShape }
-
-  TPointShape=class(TShape){change name}
+  TPointShape=class(TShape)
     private
-      NPoint:TPoint;{change to use TPoint}
+      NPoint:TPoint;
       NRadius:Integer;
 
       function GetPoint:TPoint;
@@ -45,7 +42,6 @@ type
   end;
 
   { TLineShape }
-
   TLineShape=class(TShape)
     private
       NStartPoint:TPoint;
@@ -78,99 +74,120 @@ var
 implementation
 
 procedure ReadFileIntoObjecList(AFileName: String; AObjectList: TObjectList; const ExpandValue: Integer);
-const
-  PointName='#P';
-  LineName='#L';
 var
-  FileHandle:TextFile;
+  FileHandler:TextFile;
   TempString:String;
   TempStringList:TStringList;
-  ShapeObject:TShape;
-  ShapeName:TShapeType;
-  ShapeRadius:LongInt;
+  ShapeName:String;
+  ShapeType:TShapeType;
+  ShapeRadius:Integer;
   Point1, Point2:TPoint;
+  ShapeObject:TShape;
 begin
+  if not FileExists(AFileName) then
+  begin
+    ShowMessage('cannot find the file.');
+    Exit;
+  end;
+
+  AssignFile(FileHandler, AFileName);
+  TempString:='';
+  TempStringList:=TStringList.Create;
+  ShapeName:='';
+  ShapeType:=None;
+  ShapeRadius:=0;
+
+  Reset(FileHandler);
   try
-    AssignFile(FileHandle, AFileName);
-    Reset(FileHandle);
     try
-      while not EOF(FileHandle) do
+      while not EOF(FileHandler) do
       begin
-        ReadLn(FileHandle, TempString);
-        ShapeName:=None;
-        TempStringList:=TStringList.Create;
-        try
-          if Length(TempString)<>0 then
-          begin
-            SplitString(TempStringList, TempString, ' ');
-            ClearEmptyStringElement(TempStringList);
-            if TempStringList[0]=PointName then ShapeName:=PointType
-            else if TempStringList[0]=LineName then ShapeName:=LineType
-            else ShapeName:=None;
+        ReadLn(FileHandler, TempString);
 
-            TempStringList.Delete(0);
-            ShapeRadius:=Trunc(StrToFloat(TempStringList[TempStringList.count-1])*ExpandValue);
+        if Length(TempString)=0 then
+          continue;
 
-            if (TempStringList.Count>=2) and IsStringListNum(TempStringList) then
-            begin
-              Point1.X:=Trunc(StrToFloat(TempStringList[0])*ExpandValue);
-              Point1.Y:=Trunc(StrToFloat(TempStringList[1])*ExpandValue);
+        SplitString(TempStringList, TempString, ' ');
+        ClearEmptyStringElement(TempStringList);
 
-              if (TempStringList.Count=3) and (ShapeName=PointType) then
-                ShapeObject:=TPointShape.create(ShapeName, Point1, ShapeRadius)
-              else if (TempStringList.Count=5) and (ShapeName=LineType) then
-              begin
-                Point2.X:=Trunc(StrToFloat(TempStringList[2])*ExpandValue);
-                Point2.Y:=Trunc(StrToFloat(TempStringList[3])*ExpandValue);
-                ShapeObject:=TLineShape.create(ShapeName, Point1, Point2, ShapeRadius);
-              end;
-            end;
+        ShapeName:=TempStringList[0];
+        if ShapeName='#P' then
+          ShapeType:=PointType
+        else if ShapeName='#L' then
+          ShapeType:=LineType
+        else
+          ShapeType:=None;
 
-            AObjectList.Add(ShapeObject);
-          end;
-        finally
-          TempStringList.Free;
+        RemoveStringFrom(TempStringList, ShapeName);
+        if not IsStringListNum(TempStringList) then
+           Exit;
+
+        if (TempStringList.Count=3) and (ShapeType=PointType) then
+        begin
+          Point1.X:=Trunc(StrToFloat(TempStringList[0])*ExpandValue);
+          Point1.Y:=Trunc(StrToFloat(TempStringList[1])*ExpandValue);
+          ShapeRadius:=Trunc(StrToFloat(TempStringList[2])*ExpandValue);
+          ShapeObject:=TPointShape.create(ShapeType, Point1, ShapeRadius);
+          AObjectList.Add(ShapeObject);
+        end
+        else if (TempStringList.Count=5) and (ShapeType=LineType) then
+        begin
+          Point1.X:=Trunc(StrToFloat(TempStringList[0])*ExpandValue);
+          Point1.Y:=Trunc(StrToFloat(TempStringList[1])*ExpandValue);
+          Point2.X:=Trunc(StrToFloat(TempStringList[2])*ExpandValue);
+          Point2.Y:=Trunc(StrToFloat(TempStringList[3])*ExpandValue);
+          ShapeRadius:=Trunc(StrToFloat(TempStringList[4])*ExpandValue);
+          ShapeObject:=TLineShape.create(ShapeType, Point1, Point2, ShapeRadius);
+          AObjectList.Add(ShapeObject);
         end;
       end;
-    finally
-      CloseFile(FileHandle);
+    except
+      TempStringList.Free;
     end;
-  except
-    ShowMessage('Error, cannot open the file name you assign');
+  finally
+    CloseFile(FileHandler);
   end;
 end;
 
 procedure CloneShapeObjectListTo(ATargetShapeObjectList,
   ASourceShapeObjectList: TObjectList);
 var
-  TempPointObject: TPointShape;
-  TempLineObject: TLineShape;
-  TempShapeName: TShapeType;
+  TempShapeType: TShapeType;
   TempPoint1, TempPoint2: TPoint;
+  SourcePointObject, TargetPointObject: TPointShape;
+  SourceLineObject, TargetLineObject: TLineShape;
   TempRadius: Integer;
   Index: Integer;
 begin
   ATargetShapeObjectList.Clear;
+  TempShapeType:=None;
+  TempPoint1:=Point(0,0);
+  TempPoint2:=Point(0,0);
+  TempRadius:=0;
 
   for Index:=0 to (ASourceShapeObjectList.Count-1) do
   begin
     if ASourceShapeObjectList[Index] is TPointShape then
     begin
-      TempShapeName:=PointType;
-      TempPoint1:=TPoint.Create(TPointShape(ASourceShapeObjectList[Index]).Point.x, TPointShape(ASourceShapeObjectList[Index]).Point.y);
-      TempRadius:=TPointShape(ASourceShapeObjectList[Index]).Radius;
-      TempPointObject:=TPointShape.create(TempShapeName, TempPoint1, TempRadius);
-      ATargetShapeObjectList.Add(TempPointObject);
+      SourcePointObject:=ASourceShapeObjectList[Index] as TPointShape;
+
+      TempShapeType:=PointType;
+      TempPoint1:=Point(SourcePointObject.Point.x, SourcePointObject.Point.y);
+      TempRadius:=SourcePointObject.Radius;
+      TargetPointObject:=TPointShape.create(TempShapeType, TempPoint1, TempRadius);
+      ATargetShapeObjectList.Add(TargetPointObject);
     end
     else
     if ASourceShapeObjectList[Index] is TLineShape then
     begin
-      TempShapeName:=LineType;
-      TempPoint1:=TPoint.Create(TLineShape(ASourceShapeObjectList[Index]).StartPoint.x, TLineShape(ASourceShapeObjectList[Index]).StartPoint.y);
-      TempPoint2:=TPoint.Create(TLineShape(ASourceShapeObjectList[Index]).EndPoint.y, TLineShape(ASourceShapeObjectList[Index]).EndPoint.y);
-      TempRadius:=TLineShape(ASourceShapeObjectList[Index]).Radius;
-      TempLineObject:=TLineShape.create(TempShapeName, TempPoint1, TempPoint2, TempRadius);
-      ATargetShapeObjectList.Add(TempLineObject);
+      SourceLineObject:=ASourceShapeObjectList[Index] as TLineShape;
+
+      TempShapeType:=LineType;
+      TempPoint1:= Point(SourceLineObject.StartPoint.x, SourceLineObject.StartPoint.y);
+      TempPoint2:= Point(SourceLineObject.EndPoint.x, SourceLineObject.EndPoint.y);
+      TempRadius:=SourceLineObject.Radius;
+      TargetLineObject:=TLineShape.create(TempShapeType, TempPoint1, TempPoint2, TempRadius);
+      ATargetShapeObjectList.Add(TargetLineObject);
     end;
   end;
 end;
@@ -178,38 +195,47 @@ end;
 function IsStringListNum(AStringList: TStringList): Boolean;
 var
   Index:Integer;
-  TempNum: Extended;
+  TestNum: Extended;
 begin
-  try
-    for Index:=0 to (AStringList.Count-1) do
-    begin
-      TempNum:=StrToFloat(AStringList[Index]);
-    end;
-    Result:=True;
-  except
+  Result:= True;
+
+  if AStringList.Count=0 then
+  begin
     Result:=False;
+    Exit;
+  end;
+
+  for Index:=0 to (AStringList.Count-1) do
+  begin
+    if not TryStrToFloat(AStringList[Index], TestNum) then
+    begin
+       result:= False;
+       Exit;
+    end;
   end;
 end;
 
 procedure WriteObjectListIntoFile(AFileName: String; AObjectList: TObjectList;
   const ExpandValue: Integer);
-const
-  PointName='#P';
-  LineName='#L';
 var
   FileHandler:TextFile;
   Index:Integer;
   TempPointObject:TPointShape;
   TempLineObject:TLineShape;
+  PointName, LineName:String;
 begin
-  try
-    AssignFile(FileHandler, AFileName);
-  except
-    Exit;
+  if FileExists(AFileName) then
+  begin
+     ShowMessage('File has been existed, please specify the other file name.');
+     Exit;
   end;
 
+  AssignFile(FileHandler, AFileName);
+  PointName:='#P';
+  LineName:='#L';
+  Rewrite(FileHandler);
+
   try
-    Rewrite(FileHandler);
     for Index:=0 to (AObjectList.Count-1) do
     begin
       if AObjectList[Index] is TPointShape then
@@ -249,7 +275,6 @@ begin
 end;
 
 { TLineShape }
-
 function TLineShape.GetStartPoint: TPoint;
 begin
   Result:=NStartPoint;
@@ -284,13 +309,12 @@ constructor TLineShape.create(AName: TShapeType; AStartPoint,
   AEndPoint: TPoint; ARadius: Integer);
 begin
   Inherited create(AName);
-  SetStartPoint(AStartPoint);
-  SetEndPoint(AEndPoint);
-  SetRadius(ARadius);
+  NStartPoint:=AStartPoint;
+  NEndPoint:=AEndPoint;
+  NRadius:=ARadius;
 end;
 
 { TPointShape }
-
 function TPointShape.GetPoint: TPoint;
 begin
   Result:=NPoint;
@@ -315,12 +339,11 @@ constructor TPointShape.create(AName: TShapeType; APoint: TPoint;
   ARadius: Integer);
 begin
   Inherited create(AName);
-  SetPoint(APoint);
-  SetRadius(ARadius);
+  NPoint:=APoint;
+  NRadius:=ARadius;
 end;
 
 { TShape }
-
 function TShape.GetName: TShapeType;
 begin
   Result:=NName;
@@ -333,7 +356,7 @@ end;
 
 constructor TShape.create(AName: TShapeType);
 begin
-  SetName(AName);
+  NName:=AName;
 end;
 
 end.

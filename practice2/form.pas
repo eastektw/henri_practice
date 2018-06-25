@@ -8,7 +8,25 @@ uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
   Grids, StdCtrls, Types, Contnrs, shape_data_type, check_form, tools, math;
 
+
 type
+
+  { TChangedShapeObjectList }
+
+  TChangedShapeObjectList = class(TObjectList)
+    private
+      NOriginIndexes:Array of Integer;
+
+      function GetOriginIndex(Index: Integer): Integer;
+      procedure SetOriginIndex(Index: Integer; AValue: Integer);
+    public
+      property OriginIndex[Index:Integer]:Integer read GetOriginIndex write SetOriginIndex;
+      procedure AddChangedShapeObject(AShapeObject: TShape; AOriginIndex: Integer);
+      procedure SortByOriginIndex;
+      procedure ExtraFree;
+      function FindOriginIndex(AOriginIndex: Integer): Boolean;
+      constructor Create;
+  end;
 
   { TForm1 }
 
@@ -23,6 +41,7 @@ type
     StringGrid1: TStringGrid;
     Timer1: TTimer;
 
+    procedure FormCreate(Sender: TObject);
     procedure FormResize(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure LoadFileButtonClick(Sender: TObject);
@@ -38,6 +57,8 @@ type
   private
 
   public
+    RawShapeObjectList:TObjectList;
+    ChangedShapeObjectList:TChangedShapeObjectList;
     procedure ShapeObjectListToStringGrid(AObjectList:TObjectList; AStringGrid:TStringGrid);
     procedure WriteValueToObjectList(AStringValue: String; AObjectList: TObjectList; const ACol, ARow: Integer);
     procedure UpdateShapeObjectListByForm2(AShapeObjectList: TObjectList);
@@ -53,11 +74,86 @@ const
 
 var
   Form1: TForm1;
-  FormShapeObjectList:TObjectList;
+  Form2: TForm2;
 
 implementation
 
 {$R *.lfm}
+
+{ TChangedShapeObjectList }
+
+function TChangedShapeObjectList.GetOriginIndex(Index: Integer): Integer;
+begin
+  Result:=NOriginIndexes[Index];
+end;
+
+procedure TChangedShapeObjectList.SetOriginIndex(Index: Integer; AValue: Integer
+  );
+begin
+  NOriginIndexes[Index]:=AValue;
+end;
+
+procedure TChangedShapeObjectList.AddChangedShapeObject(AShapeObject: TShape;
+  AOriginIndex: Integer);
+begin
+  Add(AShapeObject);
+  SetLength(NOriginIndexes, Length(NOriginIndexes)+1);
+  NOriginIndexes[Length(NOriginIndexes)-1]:=AOriginIndex;
+end;
+
+procedure TChangedShapeObjectList.SortByOriginIndex;
+var
+  MainIndex, SubIndex: Integer;
+  PreOriginIndex, NowOriginIndex, TempOriginIndex: Integer;
+  TempObject:TObject;
+begin
+  if Count<2 then Exit;
+
+  for MainIndex:=(Count-1) downto 1 do
+  begin
+    for SubIndex:=1 to MainIndex do
+    begin
+      PreOriginIndex:=OriginIndex[SubIndex-1];
+      NowOriginIndex:=OriginIndex[SubIndex];
+      if PreOriginIndex>NowOriginIndex then
+      begin
+        TempOriginIndex:=OriginIndex[SubIndex-1];
+        TempObject:=Items[SubIndex-1];
+        OriginIndex[SubIndex-1]:=OriginIndex[SubIndex];
+        Items[SubIndex-1]:=Items[SubIndex];
+        OriginIndex[SubIndex]:=TempOriginIndex;
+        Items[SubIndex]:=TempObject;
+      end;
+    end;
+  end;
+end;
+
+procedure TChangedShapeObjectList.ExtraFree;
+begin
+  Free;
+  SetLength(NOriginIndexes, 0);
+end;
+
+function TChangedShapeObjectList.FindOriginIndex(AOriginIndex: Integer
+  ): Boolean;
+var
+  Index:Integer;
+begin
+  Result:=False;
+  for Index:=0 to (Length(NOriginIndexes)-1) do
+  begin
+    if NOriginIndexes[Index]=AOriginIndex then
+    begin
+      Result:=True;
+      Exit;
+    end;
+  end;
+end;
+
+constructor TChangedShapeObjectList.Create;
+begin
+  SetLength(NOriginIndexes, 0);
+end;
 
 { TForm1 }
 
@@ -70,11 +166,16 @@ begin
     StringGrid1.ColWidths[ColIndex]:=EqualWidth;
 end;
 
-procedure TForm1.FormDestroy(Sender: TObject);
+procedure TForm1.FormCreate(Sender: TObject);
 begin
-  FormShapeObjectList.Free;
-  ShapeObjectList.Free;
+  EditButton.Caption:=OutEditButtonName;
 end;
+
+//procedure TForm1.FormDestroy(Sender: TObject);
+//begin
+//  RawObjectList.Free;
+//  ChangedObjectList.Free;
+//end;
 
 procedure TForm1.LoadFileButtonClick(Sender: TObject);
 var
@@ -82,19 +183,18 @@ var
 begin
   if OpenDialog1.Execute then
   begin
+    FileName:=OpenDialog1.FileName;
+    RawShapeObjectList:=TObjectList.Create;
+    ChangedShapeObjectList:=TChangedShapeObjectList.Create;
     try
-      FileName:=OpenDialog1.FileName;
-      FormShapeObjectList:=TObjectList.Create;
-      ShapeObjectList:=TObjectList.Create;
-      ReadFileIntoObjecList(FileName, ShapeObjectList, ExpandValue);
-      CloneShapeObjectListTo(FormShapeObjectList, ShapeObjectList);
-      ShapeObjectListToStringGrid(FormShapeObjectList, StringGrid1);
+      ReadFileIntoObjecList(FileName, RawShapeObjectList, ExpandValue);
+      //CloneShapeObjectListTo(FormShapeObjectList, ShapeObjectList);
+      ShapeObjectListToStringGrid(RawShapeObjectList, StringGrid1);
       EditButton.Enabled:=True;
       SaveButton.Enabled:=True;
     except
-      exit;
-      FormShapeObjectList.Free;
-      ShapeObjectList.Free;
+      RawShapeObjectList.Free;
+      ChangedShapeObjectList.ExtraFree;
     end;
   end;
 end;
@@ -119,9 +219,9 @@ begin
     EditButton.Caption:=OutEditButtonName;
     LoadFileButton.Enabled:=True;
     SaveButton.Enabled:=True;
-    UpdateShapeObjectListByForm2(FormShapeObjectList);
-    Form2.DefaultCheckStringGrid;
-    StringGrid1.Invalidate;
+    //UpdateShapeObjectListByForm2(FormShapeObjectList);
+    //Form2.DefaultCheckStringGrid;
+    //StringGrid1.Invalidate;
   end;
 end;
 
@@ -133,10 +233,10 @@ begin
   begin
     try
       FileName:=OpenDialog1.FileName;
-      CloneShapeObjectListTo(ShapeObjectList, FormShapeObjectList);
-      WriteObjectListIntoFile(FileName, ShapeObjectList, ExpandValue);
+      //CloneShapeObjectListTo(ShapeObjectList, FormShapeObjectList);
+      WriteObjectListIntoFile(FileName, RawShapeObjectList, ExpandValue);
     except
-      exit;
+
     end;
   end;
 end;
@@ -181,11 +281,11 @@ begin
     begin
       ShapeName:=StringGrid1.Cells[1, aRow];
 
-      if ShapeName=PointName then
+      if ShapeName='P' then
         if (aCol=1) or (aCol>4) then StringGrid1.Options:=StringGrid1.Options-[goEditing]
         else StringGrid1.Options:=StringGrid1.Options+[goEditing]
       else
-      if ShapeName=LineName then
+      if ShapeName='L' then
         if (aCol=1) or (aCol>6) then StringGrid1.Options:=StringGrid1.Options-[goEditing]
         else StringGrid1.Options:=StringGrid1.Options+[goEditing];
     end;
@@ -198,34 +298,35 @@ const
   UpperBound=100.0;
   lowerBound=(-100.0);
 var
-  CellInForm2, StrIsNum: Boolean;
+  OriginIndex:Integer;
+  InChangedList:Boolean;
+  StrIsNum: Boolean;
+  DataNum: Double;
+
   OriginValue, NumString: String;
-  TestNum: Extended;
   RowIndexInForm2, ColIndexInForm2: Integer;
 begin
-  RowIndexInForm2:=Form2.CheckStringGrid.Cols[0].IndexOf(StringGrid1.Rows[ARow][0]);
+  OriginIndex:=ARow-1;
+  InChangedList:=ChangedShapeObjectList.FindOriginIndex(OriginIndex);
 
-  if RowIndexInForm2=-1 then
-    CellInForm2:=False
-  else
-    CellInForm2:=True;
+  //RowIndexInForm2:=Form2.CheckStringGrid.Cols[0].IndexOf(StringGrid1.Rows[ARow][0]);
 
-  StrIsNum:=TryStrToFloat(Value, TestNum);
+  StrIsNum:=TryStrToFloat(Value, DataNum);
   if StrIsNum then
   begin
-    if (CompareValue(TestNum, UpperBound)=1) then
+    if (CompareValue(DataNum, UpperBound)=1) then
     begin
       ShowMessage('the upper bound is 100');
       StringGrid1.Cells[ACol, ARow]:='100';
     end
     else
-    if (CompareValue(TestNum, lowerBound)=-1) then
+    if (CompareValue(DataNum, lowerBound)=-1) then
     begin
       ShowMessage('the lower bound is -100');
       StringGrid1.Cells[ACol, ARow]:='-100';
     end;
 
-    OriginValue:=ValueInObjectList(FormShapeObjectList, ACol, ARow);
+    OriginValue:=ValueInObjectList(RawObjectList, ACol, ARow);
 
     if (Value<>OriginValue) then
     begin
