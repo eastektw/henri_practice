@@ -67,11 +67,47 @@ type
   procedure ClearEmptyStringElement(AStringList:TStringList);
   procedure CloneShapeObjectListTo(ATargetShapeObjectList, ASourceShapeObjectList: TObjectList);
   function IsStringListNum(AStringList:TStringList):Boolean;
-
-var
-  ShapeObjectList:TObjectList;
+  function TwoShapeObjectSame(AFirstShapeObject, ASecondShapeObject: TShape
+  ): Boolean;
 
 implementation
+
+function TwoShapeObjectSame(AFirstShapeObject, ASecondShapeObject: TShape
+  ): Boolean;
+var
+   FirstPointObject, SecondPointObject: TPointShape;
+   FirstLineObject, SecondLineObject: TLineShape;
+begin
+  Result:=False;
+  if AFirstShapeObject.ClassType<>ASecondShapeObject.ClassType then
+    Result:=False
+  else
+  begin
+    if AFirstShapeObject.Name<>ASecondShapeObject.Name then
+    begin
+      Result:=False;
+      Exit;
+    end;
+
+    if AFirstShapeObject is TPointShape then
+    begin
+      FirstPointObject:= AFirstShapeObject as TPointShape;
+      SecondPointObject:=ASecondShapeObject as TPointShape;
+      if PointsEqual(FirstPointObject.Point, SecondPointObject.Point) and
+      (FirstPointObject.Radius=SecondPointObject.Radius) then
+        Result:=True;
+    end
+    else if AFirstShapeObject is TLineShape then
+    begin
+      FirstLineObject:=AFirstShapeObject as TLineShape;
+      SecondLineObject:=ASecondShapeObject as TLineShape;
+      if PointsEqual(FirstLineObject.StartPoint, SecondLineObject.StartPoint) and
+      PointsEqual(FirstLineObject.EndPoint, SecondLineObject.EndPoint) and
+      (FirstLineObject.Radius=SecondLineObject.Radius) then
+        Result:=True;
+    end;
+  end;
+end;
 
 procedure ReadFileIntoObjecList(AFileName: String; AObjectList: TObjectList; const ExpandValue: Integer);
 var

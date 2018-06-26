@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  Grids, StdCtrls, Types, Contnrs, shape_data_type, check_form, tools, math;
+  Grids, StdCtrls, Types, Contnrs, shape_data_type, check_form, math;
 
 
 type
@@ -22,7 +22,8 @@ type
     public
       property OriginIndex[Index:Integer]:Integer read GetOriginIndex write SetOriginIndex;
       procedure AddChangedShapeObject(AShapeObject: TShape; AOriginIndex: Integer);
-      procedure SortByOriginIndex;
+      procedure RemoveOriginIndex(AOriginIndex: Integer);
+      procedure ExtraClear;
       procedure ExtraFree;
       function FindOriginIndex(AOriginIndex: Integer): Boolean;
       constructor Create;
@@ -41,7 +42,6 @@ type
     StringGrid1: TStringGrid;
     Timer1: TTimer;
 
-    procedure FormCreate(Sender: TObject);
     procedure FormResize(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure LoadFileButtonClick(Sender: TObject);
@@ -57,18 +57,20 @@ type
   private
 
   public
-    RawShapeObjectList:TObjectList;
+    OriginShapeObjectList:TObjectList;
     ChangedShapeObjectList:TChangedShapeObjectList;
+
     procedure ShapeObjectListToStringGrid(AObjectList:TObjectList; AStringGrid:TStringGrid);
-    procedure WriteValueToObjectList(AStringValue: String; AObjectList: TObjectList; const ACol, ARow: Integer);
-    procedure UpdateShapeObjectListByForm2(AShapeObjectList: TObjectList);
-    function ValueInObjectList(AObjectList: TObjectList; const ACol, ARow: Integer): String;
+    procedure LoadToChangedObjectList(const AValue: String; ACol, ARow: Integer);
+    procedure ModifyChangedObjectList(const AValue: String; ACol, ARow: Integer);
+    procedure CheckChangedObjectListAt(const ARow: Integer);
+    procedure PrintChangedObjectList;
+    procedure UpdateOriginShapeObjectList;
+    function ValueInOriginObjectList(const ACol, ARow: Integer): String;
   end;
 
 const
   ExpandValue=10000000;
-  PointName='P';
-  LineName='L';
   InEditButtonName='End Edit';
   OutEditButtonName='Edit';
 
@@ -79,6 +81,444 @@ var
 implementation
 
 {$R *.lfm}
+{ TForm1 }
+
+procedure TForm1.FormResize(Sender: TObject);
+var
+  ColIndex, EqualWidth:Integer;
+begin
+  EqualWidth:=Width div StringGrid1.ColCount;
+  for ColIndex:=0 to (StringGrid1.ColCount-1) do
+    StringGrid1.ColWidths[ColIndex]:=EqualWidth;
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  OriginShapeObjectList.Free;
+  ChangedShapeObjectList.ExtraFree;
+end;
+
+procedure TForm1.LoadFileButtonClick(Sender: TObject);
+var
+  FileName:String;
+begin
+  if OpenDialog1.Execute then
+  begin
+    OriginShapeObjectList:=TObjectList.Create;
+    ChangedShapeObjectList:=TChangedShapeObjectList.Create;
+    FileName:=OpenDialog1.FileName;
+    try
+      ReadFileIntoObjecList(FileName, OriginShapeObjectList, ExpandValue);
+      ShapeObjectListToStringGrid(OriginShapeObjectList, StringGrid1);
+      EditButton.Enabled:=True;
+      SaveButton.Enabled:=True;
+    except
+      OriginShapeObjectList.Free;
+      ChangedShapeObjectList.ExtraFree;
+    end;
+  end;
+end;
+
+procedure TForm1.EditButtonClick(Sender: TObject);
+begin
+  if EditButton.Caption=OutEditButtonName then
+  begin
+    StringGrid1.Options:=StringGrid1.Options+[GoEditing];
+    Form2.Show;
+    Form2.Left:=Form1.Left+Form1.Width;
+    Form2.Top:=Form1.Top;
+    EditButton.Caption:=InEditButtonName;
+    LoadFileButton.Enabled:=False;
+    SaveButton.Enabled:=False;
+    Timer1.Enabled:=True;
+  end
+  else
+  begin
+    StringGrid1.Options:=StringGrid1.Options-[GoEditing];
+    Form2.Hide;
+    Form2.DefaultCheckStringGrid;
+    EditButton.Caption:=OutEditButtonName;
+    LoadFileButton.Enabled:=True;
+    SaveButton.Enabled:=True;
+    UpdateOriginShapeObjectList;
+    ChangedShapeObjectList.ExtraClear;
+    StringGrid1.Invalidate;
+  end;
+end;
+
+procedure TForm1.SaveButtonClick(Sender: TObject);
+var
+  FileName:String;
+begin
+  if OpenDialog1.Execute then
+  begin
+    try
+      FileName:=OpenDialog1.FileName;
+      WriteObjectListIntoFile(FileName, OriginShapeObjectList, ExpandValue);
+    except
+    end;
+  end;
+end;
+
+procedure TForm1.StringGrid1DrawCell(Sender: TObject; aCol, aRow: Integer;
+  aRect: TRect; aState: TGridDrawState);
+var
+  OriginValue, CurrentValue: String;
+  LeftGap, TopGap: Integer;
+begin
+  if EditButton.Caption=InEditButtonName then
+  begin
+    OriginValue:=ValueInOriginObjectList(aCol, aRow);
+    CurrentValue:=StringGrid1.Cells[aCol, aRow];
+    if OriginValue<>CurrentValue then
+      StringGrid1.Canvas.Brush.Color:=clYellow;
+  end
+  else if EditButton.Caption=OutEditButtonName then
+  begin
+    StringGrid1.Canvas.Brush.Color:=clWhite;
+  end;
+
+  StringGrid1.Canvas.FillRect(aRect);
+  LeftGap:=5;
+  TopGap:=((aRect.Bottom-aRect.Top)-StringGrid1.Canvas.TextHeight(StringGrid1.Cells[ACol,ARow])) div 2;
+  StringGrid1.Canvas.TextOut(aRect.Left+LeftGap, aRect.Top+TopGap, StringGrid1.Cells[ACol,ARow]);
+end;
+
+procedure TForm1.StringGrid1SetEditText(Sender: TObject; ACol, ARow: Integer;
+  const Value: string);
+const
+  UpperBound=100.0;
+  lowerBound=(-100.0);
+var
+  OriginIndex:Integer;
+  InChangedList:Boolean;
+  StrIsNum: Boolean;
+  DataNum: Double;
+  OriginValue, NumString: String;
+begin
+  OriginIndex:=ARow-1;
+  InChangedList:=ChangedShapeObjectList.FindOriginIndex(OriginIndex);
+  StrIsNum:=TryStrToFloat(Value, DataNum);
+  OriginValue:=ValueInOriginObjectList(ACol, ARow);
+  NumString:='';
+
+  if StrIsNum then
+  begin
+    if (CompareValue(DataNum, UpperBound)=1) then
+    begin
+      ShowMessage('the upper bound is 100');
+      StringGrid1.Cells[ACol, ARow]:='100';
+    end
+    else
+    if (CompareValue(DataNum, lowerBound)=-1) then
+    begin
+      ShowMessage('the lower bound is -100');
+      StringGrid1.Cells[ACol, ARow]:='-100';
+    end;
+
+    if (Value<>OriginValue) then
+    begin
+      if not InChangedList then
+        LoadToChangedObjectList(Value, ACol, ARow)
+      else
+        ModifyChangedObjectList(Value, ACol, ARow);
+      PrintChangedObjectList;
+    end
+    else
+    if (Value=OriginValue) and InChangedList then
+    begin
+      ModifyChangedObjectList(Value, ACol, ARow);
+      CheckChangedObjectListAt(ARow);
+      PrintChangedObjectList;
+    end;
+  end
+  else
+  begin
+    NumString:=Copy(Value, 0, Length(Value)-1);
+    if Length(Value)=0 then NumString:='0';
+    StringGrid1.Cells[ACol, ARow]:=NumString;
+  end;
+end;
+
+procedure TForm1.Timer1Timer(Sender: TObject);
+begin
+  if (EditButton.Caption=InEditButtonName) and (not Form2.Showing) then
+  begin
+    EditButton.Caption:=OutEditButtonName;
+    SaveButton.Enabled:=True;
+    LoadFileButton.Enabled:=True;
+    ShapeObjectListToStringGrid(OriginShapeObjectList, StringGrid1);
+    StringGrid1.Invalidate;
+    Timer1.Enabled:=False;
+  end;
+end;
+
+procedure TForm1.ShapeObjectListToStringGrid(AObjectList: TObjectList;
+  AStringGrid: TStringGrid);
+var
+  TempShapeObject: TShape;
+  TempPointObject: TPointShape;
+  TempLineObject: TLineShape;
+  ObjectListIndex, RowStartIndex:Integer;
+  ShapeName:String;
+begin
+  AStringGrid.RowCount:=AObjectList.Count+1;
+  AStringGrid.ColCount:=7;//因為整筆資料中，線的屬性最多，其屬性的資料總共有6筆，而又要在這筆資料前面加序號，所以最多會有7筆資料要填入
+  RowStartIndex:=1;
+
+  for ObjectListIndex:=0 to (AObjectList.Count-1) do
+  begin
+    AStringGrid.Cells[0, RowStartIndex+ObjectListIndex]:=IntToStr(ObjectListIndex+1);
+
+    TempShapeObject:=AObjectList[ObjectListIndex] as TShape;
+    if TempShapeObject.Name=PointType then ShapeName:='P'
+    else if TempShapeObject.Name=LineType then ShapeName:='L'
+    else continue;
+    AStringGrid.Cells[1, RowStartIndex+ObjectListIndex]:=ShapeName;
+
+    if AObjectList[ObjectListIndex] is TPointShape then
+    begin
+      TempPointObject:=AObjectList[ObjectListIndex] as TPointShape;
+      AStringGrid.Cells[2, RowStartIndex+ObjectListIndex]:=FloatToStr(TempPointObject.Point.X / ExpandValue);
+      AStringGrid.Cells[3, RowStartIndex+ObjectListIndex]:=FloatToStr(TempPointObject.Point.Y / ExpandValue);
+      AStringGrid.Cells[4, RowStartIndex+ObjectListIndex]:=FloatToStr(TempPointObject.Radius / ExpandValue);
+    end
+    else if AObjectList[ObjectListIndex] is TLineShape then
+    begin
+      TempLineObject:=AObjectList[ObjectListIndex] as TLineShape;
+      AStringGrid.Cells[2, RowStartIndex+ObjectListIndex]:=FloatToStr(TempLineObject.StartPoint.X / ExpandValue);
+      AStringGrid.Cells[3, RowStartIndex+ObjectListIndex]:=FloatToStr(TempLineObject.StartPoint.Y / ExpandValue);
+      AStringGrid.Cells[4, RowStartIndex+ObjectListIndex]:=FloatToStr(TempLineObject.EndPoint.X / ExpandValue);
+      AStringGrid.Cells[5, RowStartIndex+ObjectListIndex]:=FloatToStr(TempLineObject.EndPoint.Y / ExpandValue);
+      AStringGrid.Cells[6, RowStartIndex+ObjectListIndex]:=FloatToStr(TempLineObject.Radius / ExpandValue);
+    end;
+  end;
+end;
+
+function TForm1.ValueInOriginObjectList(const ACol, ARow: Integer): String;
+var
+  ShapeName: String;
+  TempPointObject: TPointShape;
+  TempLineObject: TLineShape;
+begin
+  if (ACol<StringGrid1.ColCount) and (ARow<StringGrid1.RowCount) then
+  begin
+    ShapeName:=StringGrid1.Cells[1, ARow];
+    if ShapeName='P' then
+    begin
+      TempPointObject:=OriginShapeObjectList[ARow-1] as TPointShape;
+      if ACol=1 then Result:=ShapeName
+      else if ACol=2 then Result:=FloatToStr(TempPointObject.Point.x / ExpandValue)
+      else if ACol=3 then Result:=FloatToStr(TempPointObject.Point.y / ExpandValue)
+      else if ACol=4 then Result:=FloatToStr(TempPointObject.Radius / ExpandValue);
+    end
+    else if ShapeName='L' then
+    begin
+      TempLineObject:=OriginShapeObjectList[ARow-1] as TLineShape;
+      if ACol=1 then Result:=ShapeName
+      else if ACol=2 then Result:=FloatToStr(TempLineObject.StartPoint.x / ExpandValue)
+      else if ACol=3 then Result:=FloatToStr(TempLineObject.StartPoint.y / ExpandValue)
+      else if ACol=4 then Result:=FloatToStr(TempLineObject.EndPoint.x / ExpandValue)
+      else if ACol=5 then Result:=FloatToStr(TempLineObject.EndPoint.y / ExpandValue)
+      else if ACol=6 then Result:=FloatToStr(TempLineObject.Radius / ExpandValue);
+    end;
+  end;
+end;
+
+procedure TForm1.LoadToChangedObjectList(const AValue: String; ACol,
+  ARow: Integer);
+var
+  InPointObject, OutPointObject: TPointShape;
+  InLineObject, OutLineObject: TLineShape;
+  TempShapeType: TShapeType;
+  TempPoint1, TempPoint2: TPoint;
+  TempRadius: Integer;
+  NumData:Double;
+begin
+  if (ACol<2) or (ARow<1) then Exit;
+  if not TryStrToFloat(AValue, NumData) then Exit;
+
+  if OriginShapeObjectList[ARow-1] is TPointShape then
+  begin
+    InPointObject:=OriginShapeObjectList[ARow-1] as TPointShape;
+    TempShapeType:=InPointObject.Name;
+    TempPoint1:=InPointObject.Point;
+    TempRadius:=InPointObject.Radius;
+    if ACol=2 then TempPoint1.x:=trunc(NumData*ExpandValue)
+    else if ACol=3 then TempPoint1.y:=trunc(NumData*ExpandValue)
+    else if ACol=4 then TempRadius:=trunc(NumData*ExpandValue);
+    OutPointObject:=TPointShape.create(TempShapeType, TempPoint1, TempRadius);
+    ChangedShapeObjectList.AddChangedShapeObject(OutPointObject, ARow-1);
+  end
+  else if OriginShapeObjectList[ARow-1] is TLineShape then
+  begin
+    InLineObject:=OriginShapeObjectList[ARow-1] as TLineShape;
+    TempShapeType:=InLineObject.Name;
+    TempPoint1:=InLineObject.StartPoint;
+    TempPoint2:=InLineObject.EndPoint;
+    TempRadius:=InLineObject.Radius;
+    if ACol=2 then TempPoint1.x:=trunc(NumData*ExpandValue)
+    else if ACol=3 then TempPoint1.y:=trunc(NumData*ExpandValue)
+    else if ACol=4 then TempPoint2.x:=trunc(NumData*ExpandValue)
+    else if ACol=5 then TempPoint2.y:=trunc(NumData*ExpandValue)
+    else if ACol=6 then TempRadius:=trunc(NumData*ExpandValue);
+    OutLineObject:=TLineShape.create(TempShapeType, TempPoint1, TempPoint2, TempRadius);
+    ChangedShapeObjectList.AddChangedShapeObject(OutLineObject, ARow-1);
+  end;
+end;
+
+procedure TForm1.ModifyChangedObjectList(const AValue: String; ACol, ARow: Integer);
+var
+  TempPointObject: TPointShape;
+  TempLineObject: TLineShape;
+  TempPoint1, TempPoint2: TPoint;
+  Index: Integer;
+  OriginIndex: Integer;
+  ChangedIndex: Integer;
+  TestNum: Double;
+  NumData: Integer;
+begin
+  if (ACol<2) or (ARow<1) then Exit;
+  if not TryStrToFloat(AValue, TestNum) then Exit;
+
+  OriginIndex:=ARow-1;
+  NumData:=trunc(StrToFloat(AValue)*ExpandValue);
+
+  for Index:=0 to (ChangedShapeObjectList.Count-1) do
+    if ChangedShapeObjectList.OriginIndex[Index]=OriginIndex then ChangedIndex:=Index;
+
+  if ChangedShapeObjectList[ChangedIndex] is TPointShape then
+  begin
+    TempPointObject:=ChangedShapeObjectList[ChangedIndex] as TPointShape;
+    TempPoint1:=Point(TempPointObject.Point.x, TempPointObject.Point.y);
+    if ACol=2 then TempPoint1.x:=NumData
+    else if ACol=3 then TempPoint1.y:=NumData
+    else if ACol=4 then TempPointObject.Radius:=NumData;
+    TempPointObject.Point:=TempPoint1;
+  end
+  else if ChangedShapeObjectList[ChangedIndex] is TLineShape then
+  begin
+    TempLineObject:=ChangedShapeObjectList[ChangedIndex] as TLineShape;
+    TempPoint1:=Point(TempLineObject.StartPoint.x, TempLineObject.StartPoint.y);
+    TempPoint2:=Point(TempLineObject.EndPoint.x, TempLineObject.EndPoint.y);
+    if ACol=2 then TempPoint1.x:=NumData
+    else if ACol=3 then TempPoint1.y:=NumData
+    else if ACol=4 then TempPoint2.x:=NumData
+    else if ACol=5 then TempPoint2.y:=NumData
+    else if ACol=6 then TempLineObject.Radius:=NumData;
+    TempLineObject.StartPoint:=TempPoint1;
+    TempLineObject.EndPoint:=TempPoint2;
+  end;
+end;
+
+procedure TForm1.CheckChangedObjectListAt(const ARow: Integer);
+var
+  Index: Integer;
+  OriginIndex: Integer;
+  ChangedIndex:Integer;
+  TempShapeObject1, TempShapeObject2: TShape;
+begin
+  OriginIndex:=ARow-1;
+  for Index:=0 to (ChangedShapeObjectList.Count-1) do
+      if ChangedShapeObjectList.OriginIndex[Index]=OriginIndex then ChangedIndex:=Index;
+  TempShapeObject1:=OriginShapeObjectList[OriginIndex] as TShape;
+  TempShapeObject2:=ChangedShapeObjectList[ChangedIndex] as TShape;
+  if TwoShapeObjectSame(TempShapeObject1, TempShapeObject2) then
+  begin
+    ChangedShapeObjectList.Delete(ChangedIndex);
+    ChangedShapeObjectList.RemoveOriginIndex(OriginIndex);
+  end;
+end;
+
+procedure TForm1.PrintChangedObjectList;
+var
+  ChangedIndex, OriginIndex: Integer;
+  OriginPointObject: TPointShape;
+  OriginLineObject: TLineShape;
+begin
+  Form2.DefaultCheckStringGrid;
+  Form2.CheckStringGrid.RowCount:=ChangedShapeObjectList.Count+1;
+  for ChangedIndex:=0 to (ChangedShapeObjectList.Count-1) do
+  begin
+    OriginIndex:=ChangedShapeObjectList.OriginIndex[ChangedIndex];
+    if OriginShapeObjectList[OriginIndex] is TPointShape then
+    begin
+      OriginPointObject:=OriginShapeObjectList[OriginIndex] as TPointShape;
+      Form2.CheckStringGrid.Cells[0, ChangedIndex+1]:=IntToStr(OriginIndex+1);
+      Form2.CheckStringGrid.Cells[1, ChangedIndex+1]:='P';
+      Form2.CheckStringGrid.Cells[2, ChangedIndex+1]:=FloatToStr(OriginPointObject.Point.x / ExpandValue);
+      Form2.CheckStringGrid.Cells[3, ChangedIndex+1]:=FloatToStr(OriginPointObject.Point.y / ExpandValue);
+      Form2.CheckStringGrid.Cells[4, ChangedIndex+1]:=FloatToStr(OriginPointObject.Radius / ExpandValue);
+    end
+    else if OriginShapeObjectList[OriginIndex] is TLineShape then
+    begin
+      OriginLineObject:=OriginShapeObjectList[OriginIndex] as TLineShape;
+      Form2.CheckStringGrid.Cells[0, ChangedIndex+1]:=IntToStr(OriginIndex+1);
+      Form2.CheckStringGrid.Cells[1, ChangedIndex+1]:='L';
+      Form2.CheckStringGrid.Cells[2, ChangedIndex+1]:=FloatToStr(OriginLineObject.StartPoint.x / ExpandValue);
+      Form2.CheckStringGrid.Cells[3, ChangedIndex+1]:=FloatToStr(OriginLineObject.StartPoint.y / ExpandValue);
+      Form2.CheckStringGrid.Cells[4, ChangedIndex+1]:=FloatToStr(OriginLineObject.EndPoint.x / ExpandValue);
+      Form2.CheckStringGrid.Cells[5, ChangedIndex+1]:=FloatToStr(OriginLineObject.EndPoint.y / ExpandValue);
+      Form2.CheckStringGrid.Cells[6, ChangedIndex+1]:=FloatToStr(OriginLineObject.Radius / ExpandValue);
+    end;
+  end;
+end;
+
+procedure TForm1.UpdateOriginShapeObjectList;
+var
+  ChangedIndex, OriginIndex: Integer;
+  OriginPointObject, ChangedPointObject: TPointShape;
+  OriginLineObject, ChangedLineObject: TLineShape;
+begin
+  if ChangedShapeObjectList.Count=0 then Exit;
+
+  for ChangedIndex:=0 to (ChangedShapeObjectList.Count-1) do
+  begin
+    OriginIndex:=ChangedShapeObjectList.OriginIndex[ChangedIndex];
+    if OriginShapeObjectList[OriginIndex] is TPointShape then
+    begin
+      OriginPointObject:=OriginShapeObjectList[OriginIndex] as TPointShape;
+      ChangedPointObject:=ChangedShapeObjectList[ChangedIndex] as TPointShape;
+      OriginPointObject.Name:=ChangedPointObject.Name;
+      OriginPointObject.Point:=ChangedPointObject.Point;
+      OriginPointObject.Radius:=ChangedPointObject.Radius;
+    end
+    else if OriginShapeObjectList[OriginIndex] is TLineShape then
+    begin
+      OriginLineObject:=OriginShapeObjectList[OriginIndex] as TLineShape;
+      ChangedLineObject:=ChangedShapeObjectList[ChangedIndex] as TLineShape;
+      OriginLineObject.Name:=ChangedLineObject.Name;
+      OriginLineObject.StartPoint:=ChangedLineObject.StartPoint;
+      OriginLineObject.EndPoint:=ChangedLineObject.EndPoint;
+      OriginLineObject.Radius:=ChangedLineObject.Radius;
+    end;
+  end;
+end;
+
+procedure TForm1.StringGrid1SelectCell(Sender: TObject; aCol, aRow: Integer;
+  var CanSelect: Boolean);
+var
+  ShapeName: String;
+begin
+  if EditButton.Caption=InEditButtonName then
+  begin
+    if (aCol<0) and (aRow<0) then Exit;
+
+    ShapeName:=StringGrid1.Cells[1, aRow];
+
+    if ShapeName='P' then
+      if (aCol=1) or (aCol>4) then
+        StringGrid1.Options:=StringGrid1.Options-[goEditing]
+      else
+        StringGrid1.Options:=StringGrid1.Options+[goEditing]
+    else
+    if ShapeName='L' then
+      if (aCol=1) or (aCol>6) then
+        StringGrid1.Options:=StringGrid1.Options-[goEditing]
+      else
+        StringGrid1.Options:=StringGrid1.Options+[goEditing];
+  end;
+end;
 
 { TChangedShapeObjectList }
 
@@ -101,31 +541,25 @@ begin
   NOriginIndexes[Length(NOriginIndexes)-1]:=AOriginIndex;
 end;
 
-procedure TChangedShapeObjectList.SortByOriginIndex;
+procedure TChangedShapeObjectList.RemoveOriginIndex(AOriginIndex: Integer);
 var
-  MainIndex, SubIndex: Integer;
-  PreOriginIndex, NowOriginIndex, TempOriginIndex: Integer;
-  TempObject:TObject;
+  MoveBackward: Boolean;
+  Index: Integer;
 begin
-  if Count<2 then Exit;
-
-  for MainIndex:=(Count-1) downto 1 do
+  MoveBackward:=False;
+  for Index:=0 to (Length(NOriginIndexes)-1) do
   begin
-    for SubIndex:=1 to MainIndex do
-    begin
-      PreOriginIndex:=OriginIndex[SubIndex-1];
-      NowOriginIndex:=OriginIndex[SubIndex];
-      if PreOriginIndex>NowOriginIndex then
-      begin
-        TempOriginIndex:=OriginIndex[SubIndex-1];
-        TempObject:=Items[SubIndex-1];
-        OriginIndex[SubIndex-1]:=OriginIndex[SubIndex];
-        Items[SubIndex-1]:=Items[SubIndex];
-        OriginIndex[SubIndex]:=TempOriginIndex;
-        Items[SubIndex]:=TempObject;
-      end;
-    end;
+    if MoveBackward then
+       NOriginIndexes[Index-1]:=NOriginIndexes[Index];
+    if NOriginIndexes[Index]=AOriginIndex then MoveBackward:=True;
   end;
+  if MoveBackward then SetLength(NOriginIndexes, Length(NOriginIndexes)-1);
+end;
+
+procedure TChangedShapeObjectList.ExtraClear;
+begin
+  Clear;
+  SetLength(NOriginIndexes, 0);
 end;
 
 procedure TChangedShapeObjectList.ExtraFree;
@@ -152,348 +586,8 @@ end;
 
 constructor TChangedShapeObjectList.Create;
 begin
+  Inherited Create;
   SetLength(NOriginIndexes, 0);
-end;
-
-{ TForm1 }
-
-procedure TForm1.FormResize(Sender: TObject);
-var
-  ColIndex, EqualWidth:Integer;
-begin
-  EqualWidth:=Width div StringGrid1.ColCount;
-  for ColIndex:=0 to (StringGrid1.ColCount-1) do
-    StringGrid1.ColWidths[ColIndex]:=EqualWidth;
-end;
-
-procedure TForm1.FormCreate(Sender: TObject);
-begin
-  EditButton.Caption:=OutEditButtonName;
-end;
-
-//procedure TForm1.FormDestroy(Sender: TObject);
-//begin
-//  RawObjectList.Free;
-//  ChangedObjectList.Free;
-//end;
-
-procedure TForm1.LoadFileButtonClick(Sender: TObject);
-var
-  FileName:String;
-begin
-  if OpenDialog1.Execute then
-  begin
-    FileName:=OpenDialog1.FileName;
-    RawShapeObjectList:=TObjectList.Create;
-    ChangedShapeObjectList:=TChangedShapeObjectList.Create;
-    try
-      ReadFileIntoObjecList(FileName, RawShapeObjectList, ExpandValue);
-      //CloneShapeObjectListTo(FormShapeObjectList, ShapeObjectList);
-      ShapeObjectListToStringGrid(RawShapeObjectList, StringGrid1);
-      EditButton.Enabled:=True;
-      SaveButton.Enabled:=True;
-    except
-      RawShapeObjectList.Free;
-      ChangedShapeObjectList.ExtraFree;
-    end;
-  end;
-end;
-
-procedure TForm1.EditButtonClick(Sender: TObject);
-begin
-  if EditButton.Caption=OutEditButtonName then
-  begin
-    StringGrid1.Options:=StringGrid1.Options+[GoEditing];
-    Form2.Show;
-    Form2.Left:=Form1.Left+Form1.Width;
-    Form2.Top:=Form1.Top;
-    EditButton.Caption:=InEditButtonName;
-    LoadFileButton.Enabled:=False;
-    SaveButton.Enabled:=False;
-    Timer1.Enabled:=True;
-  end
-  else
-  begin
-    StringGrid1.Options:=StringGrid1.Options-[GoEditing];
-    Form2.Hide;
-    EditButton.Caption:=OutEditButtonName;
-    LoadFileButton.Enabled:=True;
-    SaveButton.Enabled:=True;
-    //UpdateShapeObjectListByForm2(FormShapeObjectList);
-    //Form2.DefaultCheckStringGrid;
-    //StringGrid1.Invalidate;
-  end;
-end;
-
-procedure TForm1.SaveButtonClick(Sender: TObject);
-var
-  FileName:String;
-begin
-  if OpenDialog1.Execute then
-  begin
-    try
-      FileName:=OpenDialog1.FileName;
-      //CloneShapeObjectListTo(ShapeObjectList, FormShapeObjectList);
-      WriteObjectListIntoFile(FileName, RawShapeObjectList, ExpandValue);
-    except
-
-    end;
-  end;
-end;
-
-procedure TForm1.StringGrid1DrawCell(Sender: TObject; aCol, aRow: Integer;
-  aRect: TRect; aState: TGridDrawState);
-var
-  OriginValue, CurrentValue: String;
-  LeftGap, TopGap: Integer;
-begin
-  if EditButton.Caption=InEditButtonName then
-  begin
-    if (aCol>0) and (aRow>0) then
-    begin
-      OriginValue:=ValueInObjectList(FormShapeObjectList, aCol, aRow);
-      CurrentValue:=StringGrid1.Cells[aCol, aRow];
-      if OriginValue<>CurrentValue then
-        StringGrid1.Canvas.Brush.Color:=clYellow;
-    end;
-  end
-  else
-  if EditButton.Caption=OutEditButtonName then
-  begin
-    if (aCol>0) and (aRow>0) then
-      StringGrid1.Canvas.Brush.Color:=clWhite;
-  end;
-
-  StringGrid1.Canvas.FillRect(aRect);
-  LeftGap:=5;
-  TopGap:=((aRect.Bottom-aRect.Top)-StringGrid1.Canvas.TextHeight(StringGrid1.Cells[ACol,ARow])) div 2;
-  StringGrid1.Canvas.TextOut(aRect.Left+LeftGap, aRect.Top+TopGap, StringGrid1.Cells[ACol,ARow]);
-end;
-
-procedure TForm1.StringGrid1SelectCell(Sender: TObject; aCol, aRow: Integer;
-  var CanSelect: Boolean);
-var
-  ShapeName: String;
-begin
-  if EditButton.Caption=InEditButtonName then
-  begin
-    if (aCol>0) and (aRow>0) then
-    begin
-      ShapeName:=StringGrid1.Cells[1, aRow];
-
-      if ShapeName='P' then
-        if (aCol=1) or (aCol>4) then StringGrid1.Options:=StringGrid1.Options-[goEditing]
-        else StringGrid1.Options:=StringGrid1.Options+[goEditing]
-      else
-      if ShapeName='L' then
-        if (aCol=1) or (aCol>6) then StringGrid1.Options:=StringGrid1.Options-[goEditing]
-        else StringGrid1.Options:=StringGrid1.Options+[goEditing];
-    end;
-  end;
-end;
-
-procedure TForm1.StringGrid1SetEditText(Sender: TObject; ACol, ARow: Integer;
-  const Value: string);
-const
-  UpperBound=100.0;
-  lowerBound=(-100.0);
-var
-  OriginIndex:Integer;
-  InChangedList:Boolean;
-  StrIsNum: Boolean;
-  DataNum: Double;
-
-  OriginValue, NumString: String;
-  RowIndexInForm2, ColIndexInForm2: Integer;
-begin
-  OriginIndex:=ARow-1;
-  InChangedList:=ChangedShapeObjectList.FindOriginIndex(OriginIndex);
-
-  //RowIndexInForm2:=Form2.CheckStringGrid.Cols[0].IndexOf(StringGrid1.Rows[ARow][0]);
-
-  StrIsNum:=TryStrToFloat(Value, DataNum);
-  if StrIsNum then
-  begin
-    if (CompareValue(DataNum, UpperBound)=1) then
-    begin
-      ShowMessage('the upper bound is 100');
-      StringGrid1.Cells[ACol, ARow]:='100';
-    end
-    else
-    if (CompareValue(DataNum, lowerBound)=-1) then
-    begin
-      ShowMessage('the lower bound is -100');
-      StringGrid1.Cells[ACol, ARow]:='-100';
-    end;
-
-    OriginValue:=ValueInObjectList(RawObjectList, ACol, ARow);
-
-    if (Value<>OriginValue) then
-    begin
-      if not CellInForm2 then
-      begin
-        for ColIndexInForm2:=0 to (Form2.CheckStringGrid.ColCount-1) do
-          SetLength(Form2.GridCells[ColIndexInForm2], Form2.CheckStringGrid.RowCount+1);
-        Form2.GridCells[aCol, Form2.CheckStringGrid.RowCount]:=clYellow;
-        Form2.CheckStringGrid.RowCount:=Form2.CheckStringGrid.RowCount+1;
-        ValueCopyStringListTo(Form2.CheckStringGrid.Rows[Form2.CheckStringGrid.RowCount-1], StringGrid1.Rows[ARow]);
-        Form2.CheckStringGrid.Cells[ACol, Form2.CheckStringGrid.RowCount-1]:=OriginValue;
-        if Form2.CheckStringGrid.RowCount>2 then Form2.SortCheckStringGridByFirstCol;
-      end
-      else
-        Form2.GridCells[aCol, RowIndexInForm2]:=clYellow;
-    end
-    else
-    if (Value=OriginValue) and CellInForm2 then
-    begin
-      if CompareTwoStringList(StringGrid1.Rows[ARow], Form2.CheckStringGrid.Rows[RowIndexInForm2]) then
-        DeleteStringGridRowAt(RowIndexInForm2, Form2.CheckStringGrid)
-      else
-        Form2.GridCells[aCol, RowIndexInForm2]:=clWhite;
-    end;
-    Form2.CheckStringGrid.Invalidate;
-  end
-  else
-  begin
-    NumString:=Copy(Value, 0, Length(Value)-1);
-    if Length(Value)=0 then NumString:='0';
-    StringGrid1.Cells[ACol, ARow]:=NumString;
-  end;
-end;
-
-procedure TForm1.Timer1Timer(Sender: TObject);
-begin
-  if (EditButton.Caption=InEditButtonName) and (not Form2.Showing) then
-  begin
-    EditButton.Caption:=OutEditButtonName;
-    SaveButton.Enabled:=True;
-    LoadFileButton.Enabled:=True;
-    ShapeObjectListToStringGrid(FormShapeObjectList, StringGrid1);
-    StringGrid1.Invalidate;
-    Timer1.Enabled:=False;
-  end;
-end;
-
-procedure TForm1.ShapeObjectListToStringGrid(AObjectList: TObjectList;
-  AStringGrid: TStringGrid);
-var
-  ObjectListIndex, RowStartIndex:Integer;
-  ShapeName:String;
-begin
-  AStringGrid.RowCount:=AObjectList.Count+1;
-  AStringGrid.ColCount:=7;//因為整筆資料中，線的屬性最多，其屬性的資料總共有6筆，而又要在這筆資料前面加序號，所以最多會有7筆資料要填入
-  RowStartIndex:=1;
-
-  for ObjectListIndex:=0 to (AObjectList.Count-1) do
-  begin
-    AStringGrid.Cells[0, RowStartIndex+ObjectListIndex]:=IntToStr(ObjectListIndex+1);
-    if TShape(AObjectList[ObjectListIndex]).Name=PointType then ShapeName:=PointName
-    else if TShape(AObjectList[ObjectListIndex]).Name=LineType then ShapeName:=LineName
-    else continue;
-    AStringGrid.Cells[1, RowStartIndex+ObjectListIndex]:=ShapeName;
-
-    if AObjectList[ObjectListIndex] is TPointShape then
-    begin
-      AStringGrid.Cells[2, RowStartIndex+ObjectListIndex]:=FloatToStr(TPointShape(AObjectList[ObjectListIndex]).Point.X / ExpandValue);
-      AStringGrid.Cells[3, RowStartIndex+ObjectListIndex]:=FloatToStr(TPointShape(AObjectList[ObjectListIndex]).Point.Y / ExpandValue);
-      AStringGrid.Cells[4, RowStartIndex+ObjectListIndex]:=FloatToStr(TPointShape(AObjectList[ObjectListIndex]).Radius / ExpandValue);
-    end
-    else if AObjectList[ObjectListIndex] is TLineShape then
-    begin
-      AStringGrid.Cells[2, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).StartPoint.X / ExpandValue);
-      AStringGrid.Cells[3, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).StartPoint.Y / ExpandValue);
-      AStringGrid.Cells[4, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).EndPoint.X / ExpandValue);
-      AStringGrid.Cells[5, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).EndPoint.Y / ExpandValue);
-      AStringGrid.Cells[6, RowStartIndex+ObjectListIndex]:=FloatToStr(TLineShape(AObjectList[ObjectListIndex]).Radius / ExpandValue);
-    end;
-  end;
-end;
-
-procedure TForm1.WriteValueToObjectList(AStringValue: String;
-  AObjectList: TObjectList; const ACol, ARow: Integer);
-var
-  ShapeName: String;
-  NumValue: Integer;
-  TempPoint1, TempPoint2: TPoint;
-  TempPointObject: TPointShape;
-  TempLineObject: TLineShape;
-begin
-  ShapeName:=StringGrid1.Cells[1, ARow];
-  NumValue:=trunc(StrToFloat(AStringValue)*ExpandValue);
-
-  if ShapeName=PointName then
-  begin
-    TempPointObject:=TPointShape(AObjectList[ARow-1]);
-    TempPoint1:=TPointShape(AObjectList[ARow-1]).Point;
-    if ACol=2 then TempPoint1.x:=NumValue
-    else if ACol=3 then TempPoint1.y:=NumValue
-    else if ACol=4 then TempPointObject.Radius:=NumValue;
-    TempPointObject.Point:=TempPoint1;
-  end
-  else
-  if ShapeName=LineName then
-  begin
-    TempLineObject:=TLineShape(AObjectList[ARow-1]);
-    TempPoint1:=TLineShape(AObjectList[ARow-1]).StartPoint;
-    TempPoint2:=TLineShape(AObjectList[ARow-1]).EndPoint;
-    if ACol=2 then TempPoint1.x:=NumValue
-    else if ACol=3 then TempPoint1.y:=NumValue
-    else if ACol=4 then TempPoint2.x:=NumValue
-    else if ACol=5 then TempPoint2.y:=NumValue
-    else if ACol=6 then TempLineObject.Radius:=NumValue;
-    TempLineObject.StartPoint:=TempPoint1;
-    TempLineObject.EndPoint:=TempPoint2;
-  end;
-end;
-
-procedure TForm1.UpdateShapeObjectListByForm2(AShapeObjectList: TObjectList);
-var
-  RowIndexInForm2, ColIndexInForm2: Integer;
-  RowIndexInForm1, ColIndexInForm1: Integer;
-begin
-  for ColIndexInForm2:=0 to (Form2.CheckStringGrid.ColCount-1) do
-  begin
-    for RowIndexInForm2:=0 to (Form2.CheckStringGrid.RowCount-1) do
-    begin
-      if Form2.GridCells[ColIndexInForm2][RowIndexInForm2]=clYellow then
-      begin
-        ColIndexInForm1:=ColIndexInForm2;
-        RowIndexInForm1:=StrToInt(Form2.CheckStringGrid.Cells[0, RowIndexInForm2]);
-        WriteValueToObjectList(StringGrid1.Cells[ColIndexInForm1, RowIndexInForm1], AShapeObjectList, ColIndexInForm1, RowIndexInForm1);
-      end;
-    end;
-  end;
-end;
-
-function TForm1.ValueInObjectList(AObjectList: TObjectList; const ACol, ARow: Integer): String;
-var
-  ObjectName: String;
-  TempObject: TShape;
-begin
-  if (ACol<StringGrid1.ColCount) and (ARow<StringGrid1.RowCount) then
-  begin
-    ObjectName:=StringGrid1.Cells[1, ARow];
-    TempObject:=TShape(AObjectList[ARow-1]);
-    if Length(ObjectName)<>0 then
-    begin
-      if ObjectName=PointName then
-      begin
-        if ACol=1 then Result:=ObjectName
-        else if ACol=2 then Result:=FloatToStr(TPointShape(TempObject).Point.x / ExpandValue)
-        else if ACol=3 then Result:=FloatToStr(TPointShape(TempObject).Point.y / ExpandValue)
-        else if ACol=4 then Result:=FloatToStr(TPointShape(TempObject).Radius / ExpandValue);
-      end
-      else if ObjectName=LineName then
-      begin
-        if ACol=1 then Result:=ObjectName
-        else if ACol=2 then Result:=FloatToStr(TLineShape(TempObject).StartPoint.x / ExpandValue)
-        else if ACol=3 then Result:=FloatToStr(TLineShape(TempObject).StartPoint.y / ExpandValue)
-        else if ACol=4 then Result:=FloatToStr(TLineShape(TempObject).EndPoint.x / ExpandValue)
-        else if ACol=5 then Result:=FloatToStr(TLineShape(TempObject).EndPoint.y / ExpandValue)
-        else if ACol=6 then Result:=FloatToStr(TLineShape(TempObject).Radius / ExpandValue);
-      end;
-    end;
-  end;
 end;
 
 end.
