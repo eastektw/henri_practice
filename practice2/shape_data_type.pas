@@ -65,7 +65,6 @@ type
   procedure ReadFileIntoObjecList(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer);
   procedure WriteObjectListIntoFile(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer);
   procedure ClearEmptyStringElement(AStringList:TStringList);
-  procedure CloneShapeObjectListTo(ATargetShapeObjectList, ASourceShapeObjectList: TObjectList);
   function IsStringListNum(AStringList:TStringList):Boolean;
   function TwoShapeObjectSame(AFirstShapeObject, ASecondShapeObject: TShape
   ): Boolean;
@@ -185,49 +184,6 @@ begin
   end;
 end;
 
-procedure CloneShapeObjectListTo(ATargetShapeObjectList,
-  ASourceShapeObjectList: TObjectList);
-var
-  TempShapeType: TShapeType;
-  TempPoint1, TempPoint2: TPoint;
-  SourcePointObject, TargetPointObject: TPointShape;
-  SourceLineObject, TargetLineObject: TLineShape;
-  TempRadius: Integer;
-  Index: Integer;
-begin
-  ATargetShapeObjectList.Clear;
-  TempShapeType:=None;
-  TempPoint1:=Point(0,0);
-  TempPoint2:=Point(0,0);
-  TempRadius:=0;
-
-  for Index:=0 to (ASourceShapeObjectList.Count-1) do
-  begin
-    if ASourceShapeObjectList[Index] is TPointShape then
-    begin
-      SourcePointObject:=ASourceShapeObjectList[Index] as TPointShape;
-
-      TempShapeType:=PointType;
-      TempPoint1:=Point(SourcePointObject.Point.x, SourcePointObject.Point.y);
-      TempRadius:=SourcePointObject.Radius;
-      TargetPointObject:=TPointShape.create(TempShapeType, TempPoint1, TempRadius);
-      ATargetShapeObjectList.Add(TargetPointObject);
-    end
-    else
-    if ASourceShapeObjectList[Index] is TLineShape then
-    begin
-      SourceLineObject:=ASourceShapeObjectList[Index] as TLineShape;
-
-      TempShapeType:=LineType;
-      TempPoint1:= Point(SourceLineObject.StartPoint.x, SourceLineObject.StartPoint.y);
-      TempPoint2:= Point(SourceLineObject.EndPoint.x, SourceLineObject.EndPoint.y);
-      TempRadius:=SourceLineObject.Radius;
-      TargetLineObject:=TLineShape.create(TempShapeType, TempPoint1, TempPoint2, TempRadius);
-      ATargetShapeObjectList.Add(TargetLineObject);
-    end;
-  end;
-end;
-
 function IsStringListNum(AStringList: TStringList): Boolean;
 var
   Index:Integer;
@@ -262,21 +218,21 @@ var
 begin
   if FileExists(AFileName) then
   begin
-     ShowMessage('File has been existed, please specify the other file name.');
+     ShowMessage('File has been existed, please specify another file name.');
      Exit;
   end;
 
   AssignFile(FileHandler, AFileName);
   PointName:='#P';
   LineName:='#L';
-  Rewrite(FileHandler);
 
+  Rewrite(FileHandler);
   try
     for Index:=0 to (AObjectList.Count-1) do
     begin
       if AObjectList[Index] is TPointShape then
       begin
-        TempPointObject:=TPointShape(AObjectList[Index]);
+        TempPointObject:=AObjectList[Index] as TPointShape;
         Write(FileHandler, PointName + ' ');
         Write(FileHandler, FloatToStr(TempPointObject.Point.x / ExpandValue) + ' ');
         Write(FileHandler, FloatToStr(TempPointObject.Point.y / ExpandValue) + ' ');
@@ -285,7 +241,7 @@ begin
       end
       else if AObjectList[Index] is TLineShape then
       begin
-        TempLineObject:=TLineShape(AObjectList[Index]);
+        TempLineObject:=AObjectList[Index] as TLineShape;
         Write(FileHandler, LineName + ' ');
         Write(FileHandler, FloatToStr(TempLineObject.StartPoint.x / ExpandValue) + ' ');
         Write(FileHandler, FloatToStr(TempLineObject.StartPoint.y / ExpandValue) + ' ');

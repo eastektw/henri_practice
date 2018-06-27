@@ -165,18 +165,22 @@ procedure TForm1.StringGrid1DrawCell(Sender: TObject; aCol, aRow: Integer;
 var
   OriginValue, CurrentValue: String;
   LeftGap, TopGap: Integer;
+  InDataRegion: Boolean;
 begin
-  if EditButton.Caption=InEditButtonName then
+  if (aCol>0) and (aRow>0) then
+    InDataRegion:=True
+  else
+    InDataRegion:=False;
+
+  if (EditButton.Caption=InEditButtonName) and InDataRegion then
   begin
     OriginValue:=ValueInOriginObjectList(aCol, aRow);
     CurrentValue:=StringGrid1.Cells[aCol, aRow];
     if OriginValue<>CurrentValue then
       StringGrid1.Canvas.Brush.Color:=clYellow;
   end
-  else if EditButton.Caption=OutEditButtonName then
-  begin
+  else if (EditButton.Caption=OutEditButtonName) and InDataRegion then
     StringGrid1.Canvas.Brush.Color:=clWhite;
-  end;
 
   StringGrid1.Canvas.FillRect(aRect);
   LeftGap:=5;
@@ -202,7 +206,13 @@ begin
   OriginValue:=ValueInOriginObjectList(ACol, ARow);
   NumString:='';
 
-  if StrIsNum then
+  if not StrIsNum then
+  begin
+    NumString:=Copy(Value, 0, Length(Value)-1);
+    if Length(Value)=0 then NumString:='0';
+    StringGrid1.Cells[ACol, ARow]:=NumString;
+  end
+  else
   begin
     if (CompareValue(DataNum, UpperBound)=1) then
     begin
@@ -225,18 +235,14 @@ begin
       PrintChangedObjectList;
     end
     else
-    if (Value=OriginValue) and InChangedList then
     begin
-      ModifyChangedObjectList(Value, ACol, ARow);
-      CheckChangedObjectListAt(ARow);
-      PrintChangedObjectList;
+      if InChangedList then
+      begin
+        ModifyChangedObjectList(Value, ACol, ARow);
+        CheckChangedObjectListAt(ARow);
+        PrintChangedObjectList;
+      end;
     end;
-  end
-  else
-  begin
-    NumString:=Copy(Value, 0, Length(Value)-1);
-    if Length(Value)=0 then NumString:='0';
-    StringGrid1.Cells[ACol, ARow]:=NumString;
   end;
 end;
 
@@ -262,6 +268,7 @@ var
   ObjectListIndex, RowStartIndex:Integer;
   ShapeName:String;
 begin
+  ShapeName:='';
   AStringGrid.RowCount:=AObjectList.Count+1;
   AStringGrid.ColCount:=7;//因為整筆資料中，線的屬性最多，其屬性的資料總共有6筆，而又要在這筆資料前面加序號，所以最多會有7筆資料要填入
   RowStartIndex:=1;
@@ -499,11 +506,15 @@ procedure TForm1.StringGrid1SelectCell(Sender: TObject; aCol, aRow: Integer;
   var CanSelect: Boolean);
 var
   ShapeName: String;
+  InDataRegion: Boolean;
 begin
-  if EditButton.Caption=InEditButtonName then
-  begin
-    if (aCol<0) and (aRow<0) then Exit;
+  if (aCol<2) and (aRow<1) then
+    InDataRegion:=False
+  else
+    InDataRegion:=True;
 
+  if EditButton.Caption=InEditButtonName and InDataRegion then
+  begin
     ShapeName:=StringGrid1.Cells[1, aRow];
 
     if ShapeName='P' then
