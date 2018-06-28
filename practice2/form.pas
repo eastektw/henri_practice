@@ -60,6 +60,7 @@ type
     OriginShapeObjectList:TObjectList;
     ChangedShapeObjectList:TChangedShapeObjectList;
 
+    //procedure
     procedure ShapeObjectListToStringGrid(AObjectList:TObjectList; AStringGrid:TStringGrid);
     procedure LoadToChangedObjectList(const AValue: String; ACol, ARow: Integer);
     procedure ModifyChangedObjectList(const AValue: String; ACol, ARow: Integer);
@@ -513,7 +514,7 @@ begin
   else
     InDataRegion:=True;
 
-  if EditButton.Caption=InEditButtonName and InDataRegion then
+  if (EditButton.Caption=InEditButtonName) and InDataRegion then
   begin
     ShapeName:=StringGrid1.Cells[1, aRow];
 

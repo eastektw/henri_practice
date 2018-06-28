@@ -62,12 +62,59 @@ type
       constructor create(AName:TShapeType; AStartPoint, AEndPoint:TPoint; ARadius:Integer);
   end;
 
+  { TChangedShapeObject }
+
+  TChangedShapeObject=class(TObject)
+    private
+      FChangedShapeObject:TShape;
+      FOriginIndex:Integer;
+
+      function GetChangedShapeObject: TShape;
+      procedure SetChangedShapeObject(AShapeObject: TShape);
+      function GetOriginIndex: Integer;
+      procedure SetOriginIndex(AOriginIndex: Integer);
+    public
+      property ChangedShapeObject:TShape read GetChangedShapeObject write SetChangedShapeObject;
+      property OriginIndex:Integer read GetOriginIndex write SetOriginIndex;
+
+      constructor create(AShapeObject: TShape; AOriginIndex: Integer);
+  end;
+
+  procedure CreateShapeObjectToObjectList(AObjectList: TObjectList; AShapeType: TShapeType; ANumStringList: TStringList; const ExpandValue: Integer);
   procedure ReadFileIntoObjecList(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer);
   procedure WriteObjectListIntoFile(AFileName:String; AObjectList:TObjectList; const ExpandValue: Integer);
   procedure ClearEmptyStringElement(AStringList:TStringList);
   function IsStringListNum(AStringList:TStringList):Boolean;
   function TwoShapeObjectSame(AFirstShapeObject, ASecondShapeObject: TShape
   ): Boolean;
+
+{ container type }
+type
+
+  { TChangedShapeObjectList }
+
+  TChangedShapeObjectList=class(TObjectList)
+    private
+      function GetChangedShapeObject(Index: Integer):TChangedShapeObject;
+      procedure SetChangedShapeObject(Index: Integer; AChangedShapeObject: TChangedShapeObject);
+    public
+      function AddChangedShapeObject(AChangedShapeObject: TChangedShapeObject): Integer;
+      procedure InsertChangedShapeObject(Index: Integer; AChangedShapeObject: TChangedShapeObject);
+      property ChangedShapeObjects[Index: Integer]: TChangedShapeObject read GetChangedShapeObject write SetChangedShapeObject; default;
+  end;
+
+  { TOriginShapeObjectList }
+
+  TOriginShapeObjectList=class(TObjectList)
+    private
+      function GetOriginShapeObject(Index: Integer):TShape;
+      procedure SetOriginShapeObject(Index: Integer; AOriginShapeObject: TShape);
+    public
+      function AddOriginShapeObject(AOriginShapeObject: TShape): Integer;
+      procedure InsertOriginShapeObject(Index: Integer; AOriginShapeObject: TShape);
+      property OriginShapeObjects[Index: Integer]: TShape read GetOriginShapeObject write SetOriginShapeObject; default;
+  end;
+
 
 implementation
 
@@ -83,27 +130,61 @@ begin
   else
   begin
     if AFirstShapeObject.Name<>ASecondShapeObject.Name then
+      Result:=False
+    else
     begin
-      Result:=False;
-      Exit;
+      if AFirstShapeObject.Name=PointType then
+      begin
+        FirstPointObject:=AFirstShapeObject as TPointShape;
+        SecondPointObject:=ASecondShapeObject as TPointShape;
+        if PointsEqual(FirstPointObject.Point, SecondPointObject.Point) and
+        (FirstPointObject.Radius=SecondPointObject.Radius) then
+          Result:=True;
+      end
+      else if AFirstShapeObject.Name=LineType then
+      begin
+        FirstLineObject:=AFirstShapeObject as TLineShape;
+        SecondLineObject:=ASecondShapeObject as TLineShape;
+        if PointsEqual(FirstLineObject.StartPoint, SecondLineObject.StartPoint) and
+        PointsEqual(FirstLineObject.EndPoint, SecondLineObject.EndPoint) and
+        (FirstLineObject.Radius=SecondLineObject.Radius) then
+          Result:=True;
+      end;
     end;
+  end;
+end;
 
-    if AFirstShapeObject is TPointShape then
+procedure CreateShapeObjectToObjectList(AObjectList: TObjectList;
+  AShapeType: TShapeType; ANumStringList: TStringList;
+  const ExpandValue: Integer);
+var
+   Point1, Point2:TPoint;
+   ShapeRadius:Integer;
+   ShapeObject: TShape;
+begin
+  ShapeRadius:=0;
+  if IsStringListNum(ANumStringList) then
+  begin
+    if (ANumStringList.Count=3) and (AShapeType=PointType) then
     begin
-      FirstPointObject:= AFirstShapeObject as TPointShape;
-      SecondPointObject:=ASecondShapeObject as TPointShape;
-      if PointsEqual(FirstPointObject.Point, SecondPointObject.Point) and
-      (FirstPointObject.Radius=SecondPointObject.Radius) then
-        Result:=True;
+      Point1.X:=Trunc(StrToFloat(ANumStringList[0])*ExpandValue);
+      Point1.Y:=Trunc(StrToFloat(ANumStringList[1])*ExpandValue);
+      ShapeRadius:=Trunc(StrToFloat(ANumStringList[2])*ExpandValue);
+      ShapeObject:=TPointShape.create(PointType, Point1, ShapeRadius);
+      AObjectList.Add(ShapeObject);
     end
-    else if AFirstShapeObject is TLineShape then
+    else if (ANumStringList.Count=5) and (AShapeType=LineType) then
     begin
-      FirstLineObject:=AFirstShapeObject as TLineShape;
-      SecondLineObject:=ASecondShapeObject as TLineShape;
-      if PointsEqual(FirstLineObject.StartPoint, SecondLineObject.StartPoint) and
-      PointsEqual(FirstLineObject.EndPoint, SecondLineObject.EndPoint) and
-      (FirstLineObject.Radius=SecondLineObject.Radius) then
-        Result:=True;
+      Point1.X:=Trunc(StrToFloat(ANumStringList[0])*ExpandValue);
+      Point1.Y:=Trunc(StrToFloat(ANumStringList[1])*ExpandValue);
+      Point2.X:=Trunc(StrToFloat(ANumStringList[2])*ExpandValue);
+      Point2.Y:=Trunc(StrToFloat(ANumStringList[3])*ExpandValue);
+      ShapeRadius:=Trunc(StrToFloat(ANumStringList[4])*ExpandValue);
+      ShapeObject:=TLineShape.create(AShapeType, Point1, Point2, ShapeRadius);
+      AObjectList.Add(ShapeObject);
+    end
+    else
+    begin
     end;
   end;
 end;
@@ -115,9 +196,6 @@ var
   TempStringList:TStringList;
   ShapeName:String;
   ShapeType:TShapeType;
-  ShapeRadius:Integer;
-  Point1, Point2:TPoint;
-  ShapeObject:TShape;
 begin
   if not FileExists(AFileName) then
   begin
@@ -130,57 +208,34 @@ begin
   TempStringList:=TStringList.Create;
   ShapeName:='';
   ShapeType:=None;
-  ShapeRadius:=0;
 
   Reset(FileHandler);
   try
-    try
-      while not EOF(FileHandler) do
-      begin
-        ReadLn(FileHandler, TempString);
+    while not EOF(FileHandler) do
+    begin
+      ReadLn(FileHandler, TempString);
 
-        if Length(TempString)=0 then
-          continue;
+      if Length(TempString)=0 then
+        continue;
 
-        SplitString(TempStringList, TempString, ' ');
-        ClearEmptyStringElement(TempStringList);
+      SplitString(TempStringList, TempString, ' ');
+      ClearEmptyStringElement(TempStringList);
 
-        ShapeName:=TempStringList[0];
-        if ShapeName='#P' then
-          ShapeType:=PointType
-        else if ShapeName='#L' then
-          ShapeType:=LineType
-        else
-          ShapeType:=None;
+      ShapeName:=TempStringList[0];
+      if ShapeName='#P' then
+        ShapeType:=PointType
+      else if ShapeName='#L' then
+        ShapeType:=LineType
+      else
+        ShapeType:=None;
 
-        RemoveStringFrom(TempStringList, ShapeName);
-        if not IsStringListNum(TempStringList) then
-           Exit;
-
-        if (TempStringList.Count=3) and (ShapeType=PointType) then
-        begin
-          Point1.X:=Trunc(StrToFloat(TempStringList[0])*ExpandValue);
-          Point1.Y:=Trunc(StrToFloat(TempStringList[1])*ExpandValue);
-          ShapeRadius:=Trunc(StrToFloat(TempStringList[2])*ExpandValue);
-          ShapeObject:=TPointShape.create(ShapeType, Point1, ShapeRadius);
-          AObjectList.Add(ShapeObject);
-        end
-        else if (TempStringList.Count=5) and (ShapeType=LineType) then
-        begin
-          Point1.X:=Trunc(StrToFloat(TempStringList[0])*ExpandValue);
-          Point1.Y:=Trunc(StrToFloat(TempStringList[1])*ExpandValue);
-          Point2.X:=Trunc(StrToFloat(TempStringList[2])*ExpandValue);
-          Point2.Y:=Trunc(StrToFloat(TempStringList[3])*ExpandValue);
-          ShapeRadius:=Trunc(StrToFloat(TempStringList[4])*ExpandValue);
-          ShapeObject:=TLineShape.create(ShapeType, Point1, Point2, ShapeRadius);
-          AObjectList.Add(ShapeObject);
-        end;
-      end;
-    except
-      TempStringList.Free;
+      RemoveStringFrom(TempStringList, ShapeName);
+      if IsStringListNum(TempStringList) then
+         CreateShapeObjectToObjectList(AObjectList, ShapeType, TempStringList, ExpandValue);
     end;
   finally
     CloseFile(FileHandler);
+    TempStringList.Free;
   end;
 end;
 
@@ -264,6 +319,86 @@ begin
   begin
     if AStringList[Index]='' then AStringList.Delete(Index);
   end;
+end;
+
+{ TOriginShapeObjectList }
+
+function TOriginShapeObjectList.GetOriginShapeObject(Index: Integer): TShape;
+begin
+  Result:=TShape(GetItem(Index))
+end;
+
+procedure TOriginShapeObjectList.SetOriginShapeObject(Index: Integer;
+  AOriginShapeObject: TShape);
+begin
+  SetItem(Index, AOriginShapeObject);
+end;
+
+function TOriginShapeObjectList.AddOriginShapeObject(AOriginShapeObject: TShape
+  ): Integer;
+begin
+  Result:=Add(AOriginShapeObject);
+end;
+
+procedure TOriginShapeObjectList.InsertOriginShapeObject(Index: Integer;
+  AOriginShapeObject: TShape);
+begin
+  Insert(Index, AOriginShapeObject);
+end;
+
+{ TChangedShapeObjectList }
+
+function TChangedShapeObjectList.GetChangedShapeObject(Index: Integer
+  ): TChangedShapeObject;
+begin
+  Result:=TChangedShapeObject(GetItem(Index));
+end;
+
+procedure TChangedShapeObjectList.SetChangedShapeObject(Index: Integer;
+  AChangedShapeObject: TChangedShapeObject);
+begin
+  SetItem(Index, AChangedShapeObject);
+end;
+
+function TChangedShapeObjectList.AddChangedShapeObject(
+  AChangedShapeObject: TChangedShapeObject): Integer;
+begin
+  Result:=Add(AChangedShapeObject);
+end;
+
+procedure TChangedShapeObjectList.InsertChangedShapeObject(Index: Integer;
+  AChangedShapeObject: TChangedShapeObject);
+begin
+  Insert(Index, AChangedShapeObject);
+end;
+
+{ TChangedShapeObject }
+
+function TChangedShapeObject.GetChangedShapeObject: TShape;
+begin
+  Result:=FChangedShapeObject;
+end;
+
+procedure TChangedShapeObject.SetChangedShapeObject(AShapeObject: TShape);
+begin
+  FChangedShapeObject:=AShapeObject;
+end;
+
+function TChangedShapeObject.GetOriginIndex: Integer;
+begin
+  Result:=FOriginIndex;
+end;
+
+procedure TChangedShapeObject.SetOriginIndex(AOriginIndex: Integer);
+begin
+  FOriginIndex:=AOriginIndex;
+end;
+
+constructor TChangedShapeObject.create(AShapeObject: TShape;
+  AOriginIndex: Integer);
+begin
+  FChangedShapeObject:=AShapeObject;
+  FOriginIndex:=AOriginIndex;
 end;
 
 { TLineShape }

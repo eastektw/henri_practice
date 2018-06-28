@@ -20,6 +20,8 @@ type
   private
 
   public
+    procedure EqualizeColWidth(AStringGrid: TStringGrid);
+    procedure StringGridToEmptyShapeObjectFormat(AStringGrid: TStringGrid);
     procedure DefaultCheckStringGrid;
   end;
 
@@ -31,23 +33,32 @@ implementation
 
 procedure TForm2.FormCreate(Sender: TObject);
 begin
-  CheckStringGrid.RowCount:=1;
-  CheckStringGrid.ColCount:=7;
+  DefaultCheckStringGrid;
 end;
 
 procedure TForm2.FormResize(Sender: TObject);
-var
-  ColIndex, EqualWidth:Integer;
 begin
-  EqualWidth:=Width div CheckStringGrid.ColCount;
-  for ColIndex:=0 to (CheckStringGrid.ColCount-1) do
-    CheckStringGrid.ColWidths[ColIndex]:=EqualWidth;
+  EqualizeColWidth(CheckStringGrid);
+end;
+
+procedure TForm2.EqualizeColWidth(AStringGrid: TStringGrid);
+var
+  EqualWidth:Integer;
+begin
+  EqualWidth:=Self.Width div CheckStringGrid.ColCount;
+  AStringGrid.DefaultColWidth:=EqualWidth;
+end;
+
+procedure TForm2.StringGridToEmptyShapeObjectFormat(AStringGrid: TStringGrid);
+begin
+  AStringGrid.RowCount:=1;
+  AStringGrid.ColCount:=7;
 end;
 
 procedure TForm2.DefaultCheckStringGrid;
 begin
-  FormCreate(Self);
-  FormResize(Self);
+  EqualizeColWidth(CheckStringGrid);
+  StringGridToEmptyShapeObjectFormat(CheckStringGrid);
 end;
 
 end.
