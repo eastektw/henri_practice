@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
-  StdCtrls, Grids;
+  StdCtrls, Grids, tools;
 
 type
 
@@ -20,7 +20,6 @@ type
   private
 
   public
-    procedure EqualizeColWidth(AStringGrid: TStringGrid);
     procedure StringGridToEmptyShapeObjectFormat(AStringGrid: TStringGrid);
     procedure DefaultCheckStringGrid;
   end;
@@ -38,15 +37,7 @@ end;
 
 procedure TForm2.FormResize(Sender: TObject);
 begin
-  EqualizeColWidth(CheckStringGrid);
-end;
-
-procedure TForm2.EqualizeColWidth(AStringGrid: TStringGrid);
-var
-  EqualWidth:Integer;
-begin
-  EqualWidth:=Self.Width div CheckStringGrid.ColCount;
-  AStringGrid.DefaultColWidth:=EqualWidth;
+  EqualizeColWidth(Self, CheckStringGrid);
 end;
 
 procedure TForm2.StringGridToEmptyShapeObjectFormat(AStringGrid: TStringGrid);
@@ -57,7 +48,7 @@ end;
 
 procedure TForm2.DefaultCheckStringGrid;
 begin
-  EqualizeColWidth(CheckStringGrid);
+  EqualizeColWidth(Self, CheckStringGrid);
   StringGridToEmptyShapeObjectFormat(CheckStringGrid);
 end;
 

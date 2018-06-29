@@ -5,13 +5,14 @@ unit tools;
 interface
 
 uses
-  Classes, SysUtils, Dialogs, Grids;
+  Classes, SysUtils, Dialogs, Grids, Forms;
 
 procedure SplitString(AStringList:TStringList; const Source, Delimiter:String; DelimitNum:Integer=0);
 procedure RemoveStringFrom(AStringList:TStringList; const AString:String);
 procedure ValueCopyStringListTo(ATargetStringList, ASourceStringList: TStrings);
 procedure DeleteStringGridRowAt(ARow: Integer; AStringGrid: TStringGrid);
 procedure CleanStringGrid(AStringGrid: TStringGrid);
+procedure EqualizeColWidth(AForm: TForm; AStringGrid: TStringGrid);
 function CompareTwoStringList(AFirstStringList, ASecondStringList: TStrings): Boolean;
 
 implementation
@@ -30,12 +31,11 @@ begin
   end;
   TempString:=Source;
   DelimiterIndex:=Pos(Delimiter,Source);
+  DelimiterCount:=0;
   if DelimiterIndex=0 then
-  begin
     AStringList.Add(Source)
-  end else
+  else
   begin
-    DelimiterCount:=0;
     while DelimiterIndex<>0 do
     begin
       AStringList.Add(copy(TempString, 0, DelimiterIndex-1));
@@ -86,6 +86,14 @@ begin
   for ColIndex:=0 to (AStringGrid.ColCount-1) do
     AStringGrid.Cols[ColIndex].Clear;
   AStringGrid.RowCount:=0;
+end;
+
+procedure EqualizeColWidth(AForm: TForm; AStringGrid: TStringGrid);
+var
+  EqualWidth: Integer;
+begin
+  EqualWidth:=AForm.Width div AStringGrid.ColCount;
+  AStringGrid.DefaultColWidth:=EqualWidth;
 end;
 
 function CompareTwoStringList(AFirstStringList, ASecondStringList: TStrings
