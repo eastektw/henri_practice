@@ -110,7 +110,11 @@ begin
   else
   begin
     for Index:=0 to AFirstStringList.Count-1 do
-    if AFirstStringList[Index]<>ASecondStringList[Index] then Result:=False
+    if AFirstStringList[Index]<>ASecondStringList[Index] then
+    begin
+      Result:=False;
+      exit;
+    end;
   end;
 end;
 

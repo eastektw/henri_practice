@@ -37,12 +37,9 @@ type
       const Value: string);
     procedure Timer1Timer(Sender: TObject);
   private
-
-  public
-
     OriginShapeObjectList:TOriginShapeObjectList;
     ChangedShapeObjectList:TChangedShapeObjectList;
-
+  public
     procedure OriginShapeObjectListToStringGrid(AOriginShapeObjectList:TOriginShapeObjectList; AStringGrid:TStringGrid);
     procedure LoadToChangedObjectList(const AValue: String; ACol, ARow: Integer);
     procedure ModifyChangedObjectList(const AValue: String; ACol, ARow: Integer);
@@ -180,18 +177,19 @@ const
   UpperBound=100.0;
   lowerBound=(-100.0);
 var
-  OriginIndex:Integer;
+  TempOriginIndex:Integer;
   InChangedList:Boolean;
   StrIsNum: Boolean;
   DataNum: Double;
   OriginValue, NumString: String;
 begin
-  OriginIndex:=ARow-1;
-  InChangedList:=ChangedShapeObjectList.HasOriginIndex(OriginIndex);
-  StrIsNum:=TryStrToFloat(Value, DataNum);
-  OriginValue:=ValueInOriginObjectList(ACol, ARow);
   OriginValue:='';
   NumString:='';
+  TempOriginIndex:=ARow-1;
+  InChangedList:=ChangedShapeObjectList.HasOriginIndex(TempOriginIndex);
+  StrIsNum:=TryStrToFloat(Value, DataNum);
+  OriginValue:=ValueInOriginObjectList(ACol, ARow);
+
 
   if not StrIsNum then
   begin
@@ -331,17 +329,17 @@ var
   TempShapeType: TShapeType;
   TempPoint1, TempPoint2: TPoint;
   TempRadius: Integer;
-  OriginIndex: Integer;
+  TempOriginIndex: Integer;
   NumData:Double;
 begin
   if (ACol<2) or (ARow<1) then Exit;
   if not TryStrToFloat(AValue, NumData) then Exit;
 
-  OriginIndex:=ARow-1;
+  TempOriginIndex:=ARow-1;
 
-  if OriginShapeObjectList[OriginIndex].Name=PointType then
+  if OriginShapeObjectList[TempOriginIndex].Name=PointType then
   begin
-    InPointObject:=OriginShapeObjectList[OriginIndex] as TPointShape;
+    InPointObject:=OriginShapeObjectList[TempOriginIndex] as TPointShape;
     TempShapeType:=InPointObject.Name;
     TempPoint1:=InPointObject.Point;
     TempRadius:=InPointObject.Radius;
@@ -349,13 +347,13 @@ begin
     else if ACol=3 then TempPoint1.y:=trunc(NumData*ExpandValue)
     else if ACol=4 then TempRadius:=trunc(NumData*ExpandValue);
     OutPointObject:=TPointShape.create(TempShapeType, TempPoint1, TempRadius);
-    ChangedPointObject:=TChangedShapeObject.create(OutPointObject, OriginIndex);
+    ChangedPointObject:=TChangedShapeObject.create(OutPointObject, TempOriginIndex);
     ChangedShapeObjectList.AddChangedShapeObject(ChangedPointObject);
     ChangedShapeObjectList.SortByOriginIndex;
   end
-  else if OriginShapeObjectList[OriginIndex].Name=LineType then
+  else if OriginShapeObjectList[TempOriginIndex].Name=LineType then
   begin
-    InLineObject:=OriginShapeObjectList[OriginIndex] as TLineShape;
+    InLineObject:=OriginShapeObjectList[TempOriginIndex] as TLineShape;
     TempShapeType:=InLineObject.Name;
     TempPoint1:=InLineObject.StartPoint;
     TempPoint2:=InLineObject.EndPoint;
@@ -366,7 +364,7 @@ begin
     else if ACol=5 then TempPoint2.y:=trunc(NumData*ExpandValue)
     else if ACol=6 then TempRadius:=trunc(NumData*ExpandValue);
     OutLineObject:=TLineShape.create(TempShapeType, TempPoint1, TempPoint2, TempRadius);
-    ChangedLineObject:=TChangedShapeObject.create(OutLineObject, OriginIndex);
+    ChangedLineObject:=TChangedShapeObject.create(OutLineObject, TempOriginIndex);
     ChangedShapeObjectList.AddChangedShapeObject(ChangedLineObject);
     ChangedShapeObjectList.SortByOriginIndex;
   end;
@@ -378,34 +376,38 @@ var
   TempLineObject: TLineShape;
   TempPoint1, TempPoint2: TPoint;
   Index: Integer;
-  OriginIndex: Integer;
-  ChangedIndex: Integer;
+  TempOriginIndex: Integer;
+  TempChangedIndex: Integer;
   TestNum: Double;
   NumData: Integer;
 begin
-  OriginIndex:=ARow-1;
-  ChangedIndex:=0;
+  TempOriginIndex:=ARow-1;
+  TempChangedIndex:=0;
   NumData:=trunc(StrToFloat(AValue)*ExpandValue);
 
   if (ACol<2) or (ARow<1) then Exit;
   if not TryStrToFloat(AValue, TestNum) then Exit;
-  if not ChangedShapeObjectList.HasOriginIndex(OriginIndex) then Exit;
+  if not ChangedShapeObjectList.HasOriginIndex(TempOriginIndex) then Exit;
 
   for Index:=0 to (ChangedShapeObjectList.Count-1) do
-    if ChangedShapeObjectList[Index].OriginIndex=OriginIndex then ChangedIndex:=Index;
+    if ChangedShapeObjectList[Index].OriginIndex=TempOriginIndex then
+    begin
+      TempChangedIndex:=Index;
+      break;
+    end;
 
-  if ChangedShapeObjectList[ChangedIndex].ChangedShapeObject.Name=PointType then
+  if ChangedShapeObjectList[TempChangedIndex].ChangedShapeObject.Name=PointType then
   begin
-    TempPointObject:=ChangedShapeObjectList[ChangedIndex].ChangedShapeObject as TPointShape;
+    TempPointObject:=ChangedShapeObjectList[TempChangedIndex].ChangedShapeObject as TPointShape;
     TempPoint1:=Point(TempPointObject.Point.x, TempPointObject.Point.y);
     if ACol=2 then TempPoint1.x:=NumData
     else if ACol=3 then TempPoint1.y:=NumData
     else if ACol=4 then TempPointObject.Radius:=NumData;
     TempPointObject.Point:=TempPoint1;
   end
-  else if ChangedShapeObjectList[ChangedIndex].ChangedShapeObject.Name=LineType then
+  else if ChangedShapeObjectList[TempChangedIndex].ChangedShapeObject.Name=LineType then
   begin
-    TempLineObject:=ChangedShapeObjectList[ChangedIndex].ChangedShapeObject as TLineShape;
+    TempLineObject:=ChangedShapeObjectList[TempChangedIndex].ChangedShapeObject as TLineShape;
     TempPoint1:=Point(TempLineObject.StartPoint.x, TempLineObject.StartPoint.y);
     TempPoint2:=Point(TempLineObject.EndPoint.x, TempLineObject.EndPoint.y);
     if ACol=2 then TempPoint1.x:=NumData
@@ -421,84 +423,88 @@ end;
 procedure TForm1.CheckChangedObjectListAt(const ARow: Integer);
 var
   Index: Integer;
-  OriginIndex: Integer;
-  ChangedIndex:Integer;
+  TempOriginIndex: Integer;
+  TempChangedIndex:Integer;
   OriginShapeObject, ChangedShapeObject: TShape;
 begin
-  OriginIndex:=ARow-1;
-  ChangedIndex:=0;
+  TempOriginIndex:=ARow-1;
+  TempChangedIndex:=0;
   for Index:=0 to (ChangedShapeObjectList.Count-1) do
-      if ChangedShapeObjectList[Index].OriginIndex=OriginIndex then ChangedIndex:=Index;
-  OriginShapeObject:=OriginShapeObjectList[OriginIndex] as TShape;
-  ChangedShapeObject:=ChangedShapeObjectList[ChangedIndex].ChangedShapeObject as TShape;
+      if ChangedShapeObjectList[Index].OriginIndex=TempOriginIndex then
+      begin
+        TempChangedIndex:=Index;
+        break;
+      end;
+  OriginShapeObject:=OriginShapeObjectList[TempOriginIndex] as TShape;
+  ChangedShapeObject:=ChangedShapeObjectList[TempChangedIndex].ChangedShapeObject as TShape;
   if TwoShapeObjectSame(OriginShapeObject, ChangedShapeObject) then
   begin
-    ChangedShapeObjectList.DeleteChangedShapeObject(ChangedIndex);
+    ChangedShapeObjectList.DeleteChangedShapeObject(TempChangedIndex);
   end;
 end;
 
 procedure TForm1.PrintChangedObjectList;
 var
-  ChangedIndex, OriginIndex: Integer;
+  TempChangedIndex, TempOriginIndex: Integer;
   OriginPointObject: TPointShape;
   OriginLineObject: TLineShape;
 begin
-  ChangedIndex:=0;
-  OriginIndex:=0;
+  TempChangedIndex:=0;
+  TempOriginIndex:=0;
   Form2.DefaultCheckStringGrid;
   Form2.CheckStringGrid.RowCount:=ChangedShapeObjectList.Count+1;
-  for ChangedIndex:=0 to (ChangedShapeObjectList.Count-1) do
+  for TempChangedIndex:=0 to (ChangedShapeObjectList.Count-1) do
   begin
-    OriginIndex:=ChangedShapeObjectList[ChangedIndex].OriginIndex;
-    if OriginShapeObjectList[OriginIndex] is TPointShape then
+    TempOriginIndex:=ChangedShapeObjectList[TempChangedIndex].OriginIndex;
+    if OriginShapeObjectList[TempOriginIndex] is TPointShape then
     begin
-      OriginPointObject:=OriginShapeObjectList[OriginIndex] as TPointShape;
-      Form2.CheckStringGrid.Cells[0, ChangedIndex+1]:=IntToStr(OriginIndex+1);
-      Form2.CheckStringGrid.Cells[1, ChangedIndex+1]:='P';
-      Form2.CheckStringGrid.Cells[2, ChangedIndex+1]:=FloatToStr(OriginPointObject.Point.x / ExpandValue);
-      Form2.CheckStringGrid.Cells[3, ChangedIndex+1]:=FloatToStr(OriginPointObject.Point.y / ExpandValue);
-      Form2.CheckStringGrid.Cells[4, ChangedIndex+1]:=FloatToStr(OriginPointObject.Radius / ExpandValue);
+      OriginPointObject:=OriginShapeObjectList[TempOriginIndex] as TPointShape;
+      Form2.CheckStringGrid.Cells[0, TempChangedIndex+1]:=IntToStr(TempOriginIndex+1);
+      Form2.CheckStringGrid.Cells[1, TempChangedIndex+1]:='P';
+      Form2.CheckStringGrid.Cells[2, TempChangedIndex+1]:=FloatToStr(OriginPointObject.Point.x / ExpandValue);
+      Form2.CheckStringGrid.Cells[3, TempChangedIndex+1]:=FloatToStr(OriginPointObject.Point.y / ExpandValue);
+      Form2.CheckStringGrid.Cells[4, TempChangedIndex+1]:=FloatToStr(OriginPointObject.Radius / ExpandValue);
     end
-    else if OriginShapeObjectList[OriginIndex] is TLineShape then
+    else if OriginShapeObjectList[TempOriginIndex] is TLineShape then
     begin
-      OriginLineObject:=OriginShapeObjectList[OriginIndex] as TLineShape;
-      Form2.CheckStringGrid.Cells[0, ChangedIndex+1]:=IntToStr(OriginIndex+1);
-      Form2.CheckStringGrid.Cells[1, ChangedIndex+1]:='L';
-      Form2.CheckStringGrid.Cells[2, ChangedIndex+1]:=FloatToStr(OriginLineObject.StartPoint.x / ExpandValue);
-      Form2.CheckStringGrid.Cells[3, ChangedIndex+1]:=FloatToStr(OriginLineObject.StartPoint.y / ExpandValue);
-      Form2.CheckStringGrid.Cells[4, ChangedIndex+1]:=FloatToStr(OriginLineObject.EndPoint.x / ExpandValue);
-      Form2.CheckStringGrid.Cells[5, ChangedIndex+1]:=FloatToStr(OriginLineObject.EndPoint.y / ExpandValue);
-      Form2.CheckStringGrid.Cells[6, ChangedIndex+1]:=FloatToStr(OriginLineObject.Radius / ExpandValue);
+      OriginLineObject:=OriginShapeObjectList[TempOriginIndex] as TLineShape;
+      Form2.CheckStringGrid.Cells[0, TempChangedIndex+1]:=IntToStr(TempOriginIndex+1);
+      Form2.CheckStringGrid.Cells[1, TempChangedIndex+1]:='L';
+      Form2.CheckStringGrid.Cells[2, TempChangedIndex+1]:=FloatToStr(OriginLineObject.StartPoint.x / ExpandValue);
+      Form2.CheckStringGrid.Cells[3, TempChangedIndex+1]:=FloatToStr(OriginLineObject.StartPoint.y / ExpandValue);
+      Form2.CheckStringGrid.Cells[4, TempChangedIndex+1]:=FloatToStr(OriginLineObject.EndPoint.x / ExpandValue);
+      Form2.CheckStringGrid.Cells[5, TempChangedIndex+1]:=FloatToStr(OriginLineObject.EndPoint.y / ExpandValue);
+      Form2.CheckStringGrid.Cells[6, TempChangedIndex+1]:=FloatToStr(OriginLineObject.Radius / ExpandValue);
     end;
   end;
 end;
 
 procedure TForm1.UpdateOriginShapeObjectList;
 var
-  ChangedIndex, OriginIndex: Integer;
+  TempChangedIndex, TempOriginIndex: Integer;
   OriginPointObject, ChangedPointObject: TPointShape;
   OriginLineObject, ChangedLineObject: TLineShape;
 begin
-  ChangedIndex:=0;
-  OriginIndex:=0;
+  TempChangedIndex:=0;
+  TempOriginIndex:=0;
 
   if ChangedShapeObjectList.Count=0 then Exit;
 
-  for ChangedIndex:=0 to (ChangedShapeObjectList.Count-1) do
+  for TempChangedIndex:=0 to (ChangedShapeObjectList.Count-1) do
   begin
-    OriginIndex:=ChangedShapeObjectList[ChangedIndex].OriginIndex;
-    if OriginShapeObjectList[OriginIndex].Name=PointType then
+    TempOriginIndex:=ChangedShapeObjectList[TempChangedIndex].OriginIndex;
+    if OriginShapeObjectList[TempOriginIndex].Name=PointType then
     begin
-      OriginPointObject:=OriginShapeObjectList[OriginIndex] as TPointShape;
-      ChangedPointObject:=ChangedShapeObjectList[ChangedIndex].ChangedShapeObject as TPointShape;
+      OriginPointObject:=OriginShapeObjectList[TempOriginIndex] as TPointShape;
+      ChangedPointObject:=ChangedShapeObjectList[TempChangedIndex].ChangedShapeObject as TPointShape;
       OriginPointObject.Name:=ChangedPointObject.Name;
       OriginPointObject.Point:=ChangedPointObject.Point;
       OriginPointObject.Radius:=ChangedPointObject.Radius;
     end
-    else if OriginShapeObjectList[OriginIndex].Name=LineType then
+    else if OriginShapeObjectList[TempOriginIndex].Name=LineType then
     begin
-      OriginLineObject:=OriginShapeObjectList[OriginIndex] as TLineShape;
-      ChangedLineObject:=ChangedShapeObjectList[ChangedIndex].ChangedShapeObject as TLineShape;
+      OriginLineObject:=OriginShapeObjectList[TempOriginIndex] as TLineShape;
+      ChangedLineObject:=ChangedShapeObjectList[TempChangedIndex].ChangedShapeObject as TLineShape;
       OriginLineObject.Name:=ChangedLineObject.Name;
       OriginLineObject.StartPoint:=ChangedLineObject.StartPoint;
       OriginLineObject.EndPoint:=ChangedLineObject.EndPoint;
