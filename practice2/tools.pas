@@ -29,6 +29,11 @@ begin
     ShowMessage('You can''t specify empty string to be delimited, procedure exited.');
     Exit;
   end;
+  if (DelimitNum<>0) then
+  begin
+    AStringList.Add(Source);
+    Exit;
+  end;
   TempString:=Source;
   DelimiterIndex:=Pos(Delimiter,Source);
   DelimiterCount:=0;
@@ -42,7 +47,7 @@ begin
       Delete(TempString, 1, DelimiterIndex);
       DelimiterCount:=DelimiterCount+1;
       DelimiterIndex:=Pos(Delimiter, TempString);
-      if (DelimitNum<>0) and (DelimiterCount=DelimitNum) then break;
+      if (DelimiterCount=DelimitNum) then break;
     end;
     AStringList.Add(TempString);
   end;
