@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils, Dialogs, Grids, Forms;
 
-procedure SplitString(AStringList:TStringList; const Source, Delimiter:String; DelimitNum:Integer=0);
+procedure SplitString(AStringList:TStringList; const Source, Delimiter:String; DelimitNum:Integer=-1);
 procedure RemoveStringFrom(AStringList:TStringList; const AString:String);
 procedure ValueCopyStringListTo(ATargetStringList, ASourceStringList: TStrings);
 procedure DeleteStringGridRowAt(ARow: Integer; AStringGrid: TStringGrid);
@@ -29,11 +29,6 @@ begin
     ShowMessage('You can''t specify empty string to be delimited, procedure exited.');
     Exit;
   end;
-  if (DelimitNum<>0) then
-  begin
-    AStringList.Add(Source);
-    Exit;
-  end;
   TempString:=Source;
   DelimiterIndex:=Pos(Delimiter,Source);
   DelimiterCount:=0;
@@ -43,11 +38,11 @@ begin
   begin
     while DelimiterIndex<>0 do
     begin
+      if (DelimiterCount=DelimitNum) then break;
       AStringList.Add(copy(TempString, 0, DelimiterIndex-1));
       Delete(TempString, 1, DelimiterIndex);
       DelimiterCount:=DelimiterCount+1;
       DelimiterIndex:=Pos(Delimiter, TempString);
-      if (DelimiterCount=DelimitNum) then break;
     end;
     AStringList.Add(TempString);
   end;
