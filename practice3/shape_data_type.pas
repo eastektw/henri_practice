@@ -175,13 +175,15 @@ end;
 
 procedure WriteShapeObjectListIntoFile(AFileName: String;
   AShapeObjectList: TObjectList; const ExpandValue: Integer);
+const
+  PointName='#P';
+  LineName='#L';
 var
   FileHandler:TextFile;
   Index:Integer;
   TempShapeObject: TShape;
   TempPointObject:TPointShape;
   TempLineObject:TLineShape;
-  PointName, LineName:String;
 begin
   if FileExists(AFileName) then
   begin
@@ -190,8 +192,6 @@ begin
   end;
 
   AssignFile(FileHandler, AFileName);
-  PointName:='#P';
-  LineName:='#L';
 
   Rewrite(FileHandler);
   try
